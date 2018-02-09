@@ -18,10 +18,10 @@ Pkg.clone("https://github.com/ahnlabb/BioformatsLoader.jl")
 using BioformatsLoader
 using JavaCall
 
-bf_package_path = "/path/to/bioformats_package.jar"
+bfpkg_path = "/path/to/bioformats_package.jar"
 
 try
-        JavaCall.init(["-ea", "-Xmx1024M", "-Djava.class.path=$bf_package_path"])
+        JavaCall.init(["-ea", "-Xmx1024M", "-Djava.class.path=$bfpkg_path"])
 end
 ```
 

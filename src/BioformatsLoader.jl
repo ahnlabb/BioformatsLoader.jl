@@ -4,7 +4,6 @@ using LightXML
 using ImageMetadata
 
 export
-	create_service,
 	set_id,
 	OMEXMLReader,
 	openbytes,
