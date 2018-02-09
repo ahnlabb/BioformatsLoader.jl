@@ -17,14 +17,18 @@ Pkg.clone("https://github.com/ahnlabb/BioformatsLoader.jl")
 ```julia
 using BioformatsLoader
 using JavaCall
-using BioFormats
-using Images
+
+bf_package_path = "/path/to/bioformats_package.jar"
 
 try
-        JavaCall.init(["-ea", "-Xmx1024M", "-Djava.class.path=/path/to/bioformats_package.jar"])
+        JavaCall.init(["-ea", "-Xmx1024M", "-Djava.class.path=$bf_package_path"])
 end
+```
 
+To import the file `file.msr` you then do
+
+```julia
 image = bf_import("file.msr")
 ```
 
-where `/path/to/bioformats_package.jar` should be changed to fit your setup.
+The variable `image` will contain an array of ImageMetadata, the data will be the type that the format specifies: __Int8__, __UInt8__, __Int16__, __UInt16__, __Int32__, __UInt32__, __Float32__, __Float64__ or __Bool__.
