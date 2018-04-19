@@ -8,7 +8,6 @@ export
 	OMEXMLReader,
 	openbytes,
 	set_series,
-	getlength,
 	getpixeltype,
 	open_img,
 	bf_import
@@ -57,10 +56,6 @@ function set_series(oxr::OMEXMLReader, index::Int)
         jcall(oxr.reader, "setSeries", Void, (jint,), index)
 end
 
-function getlength(oxr::OMEXMLReader, name::String, imageindex::Int)
-        jcall(oxr.meta, "get" * name, JLength, (jint,), imageindex)
-end
-
 function getpixeltype(oxr::OMEXMLReader)
         id = jcall(oxr.reader, "getPixelType", jint, ())
 	return datatypes[id+1]
@@ -71,17 +66,21 @@ function islittleendian(oxr::OMEXMLReader)
 end
 
 function open_img(oxr::OMEXMLReader, index::Int)
-	@assert islittleendian(oxr) == 1
 	sx = jcall(oxr.reader, "getSizeX", jint, ())
 	sy = jcall(oxr.reader, "getSizeY", jint, ())
-	println((sx, sy))
 	arr = reinterpret(getpixeltype(oxr), openbytes(oxr, index))
+        if islittleendian == 0
+                @. arr = ntoh(arr)
+        end
 	return reshape(arr, (sx, sy))
 end
 
 datatypes = [Int8,UInt8,Int16,UInt16,Int32,UInt32,Float32,Float64,Bool]
 
-function bf_import(fname::String)
+function bf_import(fname::String; stdout_redirect=STDOUT)
+        out = STDOUT
+        rd, wr = redirect_stdout()
+
 	oxr = OMEXMLReader()
 	set_id(oxr, fname)
 	xml = parse_string(jcall(oxr.meta, "dumpXML", JString, ()))
@@ -101,7 +100,19 @@ function bf_import(fname::String)
 
 		push!(images, ImageMeta(img, properties))
 	end
-	return images
+
+        redirect_stdout(out)
+        @async begin
+                while !eof(rd)
+                        write(stdout_redirect, read(rd))
+                end
+                close(rd)
+        end
+        return images
 end
+
+pkgname = "BioformatsLoader"
+bfpkg_path = joinpath(Pkg.dir(), pkgname, "bioformats_package.jar")
+JavaCall.init(["-Djava.class.path=$bfpkg_path"])
 
 end
