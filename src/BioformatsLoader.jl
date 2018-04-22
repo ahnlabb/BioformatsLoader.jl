@@ -111,8 +111,4 @@ function bf_import(fname::String; stdout_redirect=STDOUT)
         return images
 end
 
-pkgname = "BioformatsLoader"
-bfpkg_path = joinpath(Pkg.dir(), pkgname, "bioformats_package.jar")
-JavaCall.init(["-Djava.class.path=$bfpkg_path"])
-
 end
