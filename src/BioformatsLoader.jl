@@ -148,14 +148,14 @@ function bf_import(fname::String; stdout_redirect=STDOUT)
 		push!(images, ImageMeta(img, properties))
 	end
 
-        redirect_stdout(out)
-        @async begin
-                while !eof(rd)
-                        write(stdout_redirect, read(rd))
-                end
-                close(rd)
-        end
-        return images
+    redirect_stdout(out)
+    @async begin
+            while !eof(rd)
+                    write(stdout_redirect, read(rd))
+            end
+            close(rd)
+    end
+    return images
 end
 
 function metadata(fname::String; stdout_redirect=STDOUT)
