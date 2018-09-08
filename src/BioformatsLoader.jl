@@ -201,16 +201,9 @@ function metadata(fname::String; stdout_redirect=STDOUT)
 	return properties, metalst, xml
 end
 
-function starting(MEM::Int)
-
-	# download bioformats_package.jar at https://www.openmicroscopy.org/bio-formats/downloads/
-
-	bfpkg_path = "./jars/bioformats_package.jar"
-	try
-		JavaCall.init(["-ea", "-Xmx$(MEM)M", "-Djava.class.path=$bfpkg_path"])
-	catch
-	end
-
+function init(;memory=1024::Int)
+    bfpkg_path = joinpath(@__DIR__, "..", "deps", "bioformats_package.jar")
+    JavaCall.init(["-ea", "-Xmx$(memory)M", "-Djava.class.path=$bfpkg_path"])
 end
 
 end
