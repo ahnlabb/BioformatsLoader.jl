@@ -78,7 +78,7 @@ function open_img(oxr::OMEXMLReader, index::Int)
 	return reshape(arr, (sx, sy))
 end
 
-function open_stack(fname::String; stdout_redirect=STDOUT)
+function open_stack(fname::String; stdout_redirect=stdout)
 
     rd, wr = redirect_stdout()
     oxr = OMEXMLReader()
@@ -113,7 +113,7 @@ function open_stack(fname::String; stdout_redirect=STDOUT)
     end
 
 
-    redirect_stdout(STDOUT)
+    redirect_stdout(stdout)
     @async begin
             while !eof(rd)
                     write(stdout_redirect, read(rd))
@@ -124,8 +124,8 @@ function open_stack(fname::String; stdout_redirect=STDOUT)
 
 end
 
-function bf_import(fname::String; stdout_redirect=STDOUT)
-        out = STDOUT
+function bf_import(fname::String; stdout_redirect=stdout)
+        out = stdout
         rd, wr = redirect_stdout()
 
 	oxr = OMEXMLReader()
@@ -158,7 +158,7 @@ function bf_import(fname::String; stdout_redirect=STDOUT)
     return images
 end
 
-function metadata(fname::String; stdout_redirect=STDOUT)
+function metadata(fname::String; stdout_redirect=stdout)
 
 	rd, wr = redirect_stdout()
 
@@ -191,7 +191,7 @@ function metadata(fname::String; stdout_redirect=STDOUT)
 		 end
 	 end
 
-	redirect_stdout(STDOUT)
+	redirect_stdout(stdout)
 	@async begin
 		while !eof(rd)
 			write(stdout_redirect, read(rd))
