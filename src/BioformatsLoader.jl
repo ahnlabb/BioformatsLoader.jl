@@ -203,7 +203,8 @@ end
 
 function init(;memory=1024::Int)
     bfpkg_path = joinpath(@__DIR__, "..", "deps", "bioformats_package.jar")
-    JavaCall.init(["-ea", "-Xmx$(memory)M", "-Djava.class.path=$bfpkg_path"])
+    sb6_path   = joinpath(@__DIR__, "..", "deps", "SlideBook6Reader.jar")
+    JavaCall.init(["-ea", "-Xmx$(memory)M", "-Djava.class.path=$bfpkg_path:$sb6_path"])
 end
 
 end
