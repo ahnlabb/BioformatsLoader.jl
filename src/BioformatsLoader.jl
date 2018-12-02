@@ -120,7 +120,8 @@ function read_stack(oxr::OMEXMLReader)
     if islittleendian(oxr)
         @. arr = ntoh(arr)
     end
-    arr = reinterpret(PT, arr)
+    # Avoid `ReinterpretArray` and `ReshapeArray` wrappers
+    arr = collect(reinterpret(PT, arr))
 
     return AxisArray(reshape(arr, size), axisnames...)
 end
