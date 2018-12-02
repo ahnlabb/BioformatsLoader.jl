@@ -58,9 +58,10 @@ function openbytes(oxr::OMEXMLReader, index::Int)
     jcall(oxr.reader, "openBytes", Vector{jbyte}, (jint,), index)
 end
 
-function openbytes(oxr::OMEXMLReader, index::Int, data::Vector{jbyte})
-    jcall(oxr.reader, "openBytes", Vector{jbyte}, (jint, Vector{jbyte}), index, data)
-end
+# this seems broken...
+# function openbytes(oxr::OMEXMLReader, index::Int, data::Vector{jbyte})
+#     jcall(oxr.reader, "openBytes", Vector{jbyte}, (jint, Vector{jbyte}), index, data)
+# end
 
 function set_series(oxr::OMEXMLReader, index::Int)
     jcall(oxr.reader, "setSeries", Nothing, (jint,), index)
@@ -69,6 +70,10 @@ end
 function getpixeltype(oxr::OMEXMLReader)
     id = jcall(oxr.reader, "getPixelType", jint, ())
     return datatypes[id+1]
+end
+
+function getImageCount(oxr::OMEXMLReader)
+    return jcall(oxr.reader, "getImageCount", jint, ())
 end
 
 function islittleendian(oxr::OMEXMLReader)
@@ -99,7 +104,6 @@ function read_stack(oxr::OMEXMLReader)
 
     PT = getpixeltype(oxr)
 
-
     order = jcall(oxr.reader, "getDimensionOrder", JString, ())
     axisnames = ((Symbol(lowercase(c)) for c in order)...,)
     size = ntuple(5) do i
@@ -107,14 +111,14 @@ function read_stack(oxr::OMEXMLReader)
     end
 
     buf_size = Size.x * Size.y * sizeof(PT)
-    nslices = Size.c * Size.z * Size.t
+    nslices = Int(Size.c) * Size.z * Size.t
 
-    buf = Vector{jbyte}(undef, buf_size)
-    arr = Vector{jbyte}(undef, buf_size * nslices)
+    @assert getImageCount(oxr) == nslices 
 
+    arr = Array{jbyte}(undef, buf_size, nslices)
     for i in 0:(nslices-1)
-        openbytes(oxr, i, buf)
-        copyto!(arr, i*buf_size + 1, buf, 1, buf_size)
+        buf = openbytes(oxr, i)
+        copyto!(view(arr, :, i+1), buf)
     end
 
     if islittleendian(oxr)
