@@ -1,0 +1,9 @@
+name = "BioformatsLoader"
+uuid = "fb1b6777-9174-5890-95f5-b2b25127725e"
+
+[deps]
+ImageAxes = "2803e5a7-5153-5ecf-9a86-9b4c37f5f5ac"
+ImageMetadata = "bc367c6b-8a6b-528e-b4bd-a4b897500b49"
+JavaCall = "494afd89-becb-516b-aafa-70d2670c0337"
+LightXML = "9c8b4983-aa76-5018-a973-4c85ecc9e179"
+SimpleTraits = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
