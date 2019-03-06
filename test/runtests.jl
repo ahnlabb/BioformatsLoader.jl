@@ -1,7 +1,5 @@
 using BioformatsLoader
 using Test
-using JavaCall
-import Pkg
 
 BioformatsLoader.init()
 
