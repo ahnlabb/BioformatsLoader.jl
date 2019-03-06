@@ -35,7 +35,7 @@ xsd_types = Dict("xsd:byte"=>(x -> parse(Int8, x)),
                  "xsd:unsignedShort"=>(x -> parse(UInt16, x)),
                  "xsd:unsignedByte"=>(x -> parse(UInt8, x)),
                  "xsd:dateTime"=>(x->DateTime(x, Date.DateFormat("yyyy-mm-ddTHH:MM:SS.sss"))),
-                 "xsd:float"=>(x -> parse(Float32, x)),
+                 "xsd:float"=>(x -> parse(Float64, x)),
                  "xsd:double"=>(x -> parse(Float64, x)),
                  "xsd:boolean"=>(x -> parse(Bool, x))
                 )
