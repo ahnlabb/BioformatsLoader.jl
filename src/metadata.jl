@@ -1,7 +1,7 @@
 function xml_to_dict(node::XMLElement; path="")
     dict = Dict{String, Any}()
     for a=attributes(node)
-        bt = base_type("$(name(node)).$(name(a))")
+        bt = base_type_parser("$(name(node)).$(name(a))")
         val = value(a)
         if !(bt isa Nothing)
             val = bt(val)
