@@ -1,0 +1,18 @@
+name = "BioformatsLoader"
+uuid = "d1f74bce-bb60-11ea-2eff-3d75f256b4d8"
+
+[deps]
+ImageMetadata = "bc367c6b-8a6b-528e-b4bd-a4b897500b49"
+JavaCall = "494afd89-becb-516b-aafa-70d2670c0337"
+LightXML = "9c8b4983-aa76-5018-a973-4c85ecc9e179"
+
+[compat]
+ImageMetadata = "0.9"
+JavaCall = "0.7"
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]

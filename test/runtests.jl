@@ -1,8 +1,12 @@
 using BioformatsLoader
+using JavaCall
 using Test
 
-BioformatsLoader.init()
+@test BioformatsLoader.init() == nothing
 
 oxr = OMEXMLReader()
-@test oxr.reader.ptr != C_NULL
-@test oxr.meta.ptr != C_NULL
+@test !JavaCall.isnull(oxr.reader)
+@test !JavaCall.isnull(oxr.meta)
+
+nd2_file = bf_import(joinpath(@__DIR__,"test_format.nd2"))
+czi_file = bf_import(joinpath(@__DIR__,"test_zen.CZI"))
