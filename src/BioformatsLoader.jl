@@ -182,9 +182,20 @@ function metadata(fname::String)
     end
 end
 
-function init(;memory=1024::Int)
-    bfpkg_path = joinpath(@__DIR__, "..", "deps", "bioformats_package.jar")
+const levels = ["ALL", "DEBUG", "ERROR", "FATAL", "INFO", "OFF", "TRACE", "WARN"]
+function enableLogging(level::String)
+    level in levels || error("enableLogging: level argument must be one of "*join(levels,", "))
+    dt = @jimport(loci.common.DebugTools)
+    Bool(jcall(dt,"enableLogging",jboolean,(JString,),level))
+end
+
+get_bf_path() = joinpath(dirname(@__DIR__), "deps", "bioformats_package.jar")
+
+function init(;memory=1024::Int,log_level::String="ERROR")
+    bfpkg_path = get_bf_path()
     JavaCall.init(["-ea", "-Xmx$(memory)M", "-Djava.class.path=$bfpkg_path"])
+    enableLogging(log_level) || @warn "Could not enable logging."
+    nothing
 end
 
 end

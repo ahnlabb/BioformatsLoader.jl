@@ -6,22 +6,52 @@
 
 [![codecov.io](http://codecov.io/github/ahnlabb/BioformatsLoader.jl/coverage.svg?branch=master)](http://codecov.io/github/ahnlabb/BioformatsLoader.jl?branch=master)
 
-## Usage
+## Dependencies
 
-Requires `bioformats_package.jar`
+Depends on `bioformats_package.jar`
+
+## Install
 
 ```julia
-Pkg.clone("https://github.com/ahnlabb/BioformatsLoader.jl")
+Pkg.add("https://github.com/ahnlabb/BioformatsLoader.jl") # Change if forked
+Pkg.build("BuildformatsLoader") # Downloads bioformats_package.jar and ome.xsd
 ```
+
+## Setup Environment
+
+Set the environmental variable `JULIA_COPY_STACKS` to `1`. On Linux and Mac, this can be done by invoking julia in the following way:
+
+```bash
+$ JULIA_COPY_STACKS=1 julia
+```
+
+## Basic Usage
+
+```julia
+using BioformatsLoader
+BioformatsLoader.init() # Initializes JavaCall with opt and classpath
+image = bf_import("file.msr") # Import the image file.msr
+collect(image[1].data) # Get a standard Julia 2D array
+```
+
+## Advanced Usage
 
 ```julia
 using BioformatsLoader
 using JavaCall
 
-bfpkg_path = "/path/to/bioformats_package.jar"
+JavaCall.addClassPath("/path/to/bioformats_package.jar")
+# Alternatively, use the build downloaded JAR
+# JavaCall.addClassPath(BioformatsLoader.get_bf_path())
+# Add other classpath values here
+
+# Setup options
+JavaCall.addOpts("-ea")
+JavaCall.addOpts("-Xmx1024M")
+# Add other options here
 
 try
-        JavaCall.init(["-ea", "-Xmx1024M", "-Djava.class.path=$bfpkg_path"])
+        JavaCall.init()
 end
 ```
 
@@ -32,3 +62,9 @@ image = bf_import("file.msr")
 ```
 
 The variable `image` will contain an array of ImageMetadata, the data will be the type that the format specifies: __Int8__, __UInt8__, __Int16__, __UInt16__, __Int32__, __UInt32__, __Float32__, __Float64__ or __Bool__.
+
+If you just want a plain array of the first frame:
+
+```julia
+plain_array = collect(image[1].data)
+```
