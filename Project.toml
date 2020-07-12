@@ -1,5 +1,6 @@
 name = "BioformatsLoader"
 uuid = "d1f74bce-bb60-11ea-2eff-3d75f256b4d8"
+version = "0.1.0"
 
 [deps]
 ImageMetadata = "bc367c6b-8a6b-528e-b4bd-a4b897500b49"
