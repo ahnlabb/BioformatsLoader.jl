@@ -47,7 +47,9 @@ jobs:
     env: JULIA_COPY_STACKS=1
   allow_failures:
   - julia: nightly
-
+cache:
+  directories:
+  - $HOME/.julia/artifacts
 
 ## uncomment the following lines to allow failures on nightly julia
 ## (tests will run but not make your overall status red)
