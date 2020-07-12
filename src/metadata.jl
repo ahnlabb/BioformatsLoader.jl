@@ -1,24 +1,24 @@
 function xml_to_dict(node::XMLElement; path="")
-    dict = Dict{String, Any}()
+    dict = Dict{Symbol, Any}()
     for a=attributes(node)
         bt = base_type_parser("$(name(node)).$(name(a))")
         val = value(a)
         if !(bt isa Nothing)
             val = bt(val)
         end
-        dict[name(a)] = val
+        dict[Symbol(name(a))] = val
     end
     for n=child_elements(node)
         nxt = xml_to_dict(n)
         if name(n) in keys(dict)
-            cur = dict[name(n)]
+            cur = dict[Symbol(name(n))]
             if cur isa Array
                 push!(cur, nxt)
             else
-                dict[name(n)] = [cur, nxt]
+                dict[Symbol(name(n))] = [cur, nxt]
             end
         else
-            dict[name(n)] = nxt
+            dict[Symbol(name(n))] = nxt
         end
     end
     return dict
