@@ -10,3 +10,5 @@ oxr = OMEXMLReader()
 
 nd2_file = bf_import(joinpath(@__DIR__,"test_format.nd2"))
 czi_file = bf_import(joinpath(@__DIR__,"test_zen.CZI"))
+
+@test size(nd2_file) == (1,)

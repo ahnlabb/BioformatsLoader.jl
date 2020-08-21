@@ -4,15 +4,17 @@ using LightXML
 using ImageMetadata
 
 export
-set_id,
-OMEXMLReader,
-openbytes,
-set_series,
-getpixeltype,
-open_img,
-bf_import,
-open_stack,
-metadata
+    set_id,
+    OMEXMLReader,
+    openbytes,
+    set_series,
+    getpixeltype,
+    open_img,
+    bf_import,
+    open_stack,
+    metadata,
+    arraydata
+
 
 include("metadata.jl")
 
@@ -104,17 +106,17 @@ end
 function open_stack(fname::String)
     oxr = OMEXMLReader()
     set_id(oxr, fname)
+    return open_stack(oxr)
+end
 
-    SizeX = jcall(oxr.reader, "getSizeX", jint, ())
-    SizeY = jcall(oxr.reader, "getSizeY", jint, ())
-    SizeC = jcall(oxr.reader, "getSizeC", jint, ())
-    SizeZ = jcall(oxr.reader, "getSizeZ", jint, ())
-    SizeT = jcall(oxr.reader, "getSizeT", jint, ())
-    order = jcall(oxr.reader, "getDimensionOrder", JString, ())
+function open_stack(oxr::OMEXMLReader; order="TZXYC")
+    image_order = jcall(oxr.reader, "getDimensionOrder", JString, ())
+    sizes = [jcall(oxr.reader, "getSize$d", jint, ()) for d in image_order]
+    size_dict = Dict(zip(image_order, sizes))
 
     arr = openbytes(oxr, 0)
 
-    for i in 1:((SizeC*SizeZ*SizeT)-1)
+    for i in 1:(prod(size_dict[d] for d in "TZC")-1)
         arr_nd = openbytes(oxr, i)
         append!(arr,arr_nd)
     end
@@ -124,14 +126,10 @@ function open_stack(fname::String)
     end
     arr = reinterpret(getpixeltype(oxr), arr)
 
-    #Scikit image order of dimension TZXYC (permutedims)
-    if order == "XYCZT"
-        im = reshape(arr, (SizeX, SizeY, SizeC, SizeZ, SizeT))
-        im = permutedims(im, [5,4,1,2,3])
-    elseif order == "XYZTC"
-        im = reshape(arr, (SizeX, SizeY, SizeZ, SizeT, SizeC))
-        im = permutedims(im, [4,3,1,2,5])
-    end
+    im = reshape(arr, (sizes...,))
+    im = permutedims(im, [findfirst(c, image_order) for c in order])
+
+    return im
 end
 
 function bf_import(fname::String)
@@ -143,7 +141,7 @@ function bf_import(fname::String)
     metalst = get_elements_by_tagname(root(xml), "Image")
     for i = 1:length(metalst)
         set_series(oxr, i-1)
-        img = open_img(oxr, 0)
+        img = open_stack(oxr, order = "TZYXC")
         properties = xml_to_dict(metalst[i])
         push!(images, ImageMeta(img, properties))
     end
