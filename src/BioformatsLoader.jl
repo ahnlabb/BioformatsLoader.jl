@@ -115,7 +115,7 @@ function open_stack(oxr::OMEXMLReader; order="TZYXC")
     size_dict = Dict(zip(image_order, sizes))
 
     for c in image_order
-        if !in(order, c)
+        if !in(c, order)
             @assert (size_dict[c] == 1) "Non-singleton dimension \"$c\" is not present in the requested image order \"$order\""
             delete!(sizes_dict, c)
         end
