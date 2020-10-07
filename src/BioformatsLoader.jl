@@ -109,10 +109,17 @@ function open_stack(fname::String)
     return open_stack(oxr)
 end
 
-function open_stack(oxr::OMEXMLReader; order="TZXYC")
+function open_stack(oxr::OMEXMLReader; order="TZYXC")
     image_order = jcall(oxr.reader, "getDimensionOrder", JString, ())
     sizes = [jcall(oxr.reader, "getSize$d", jint, ()) for d in image_order]
     size_dict = Dict(zip(image_order, sizes))
+
+    for c in image_order
+        if !in(order, c)
+            @assert (size_dict[c] == 1) "Non-singleton dimension \"$c\" is not present in the requested image order \"$order\""
+            delete!(sizes_dict, c)
+        end
+    end
 
     arr = openbytes(oxr, 0)
 
@@ -132,7 +139,7 @@ function open_stack(oxr::OMEXMLReader; order="TZXYC")
     return im
 end
 
-function bf_import(fname::String)
+function bf_import(fname::String; order="TZYXC")
     oxr = OMEXMLReader()
     set_id(oxr, fname)
     xml = parse_string(jcall(oxr.meta, "dumpXML", JString, ()))
@@ -141,7 +148,7 @@ function bf_import(fname::String)
     metalst = get_elements_by_tagname(root(xml), "Image")
     for i = 1:length(metalst)
         set_series(oxr, i-1)
-        img = open_stack(oxr, order = "TZYXC")
+        img = open_stack(oxr; order = "TZYXC")
         properties = xml_to_dict(metalst[i])
         push!(images, ImageMeta(img, properties))
     end
