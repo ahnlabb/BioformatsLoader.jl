@@ -1,0 +1,2 @@
+#!/bin/bash
+JULIA_COPY_STACKS=1 exec "$@"
