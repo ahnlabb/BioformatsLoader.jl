@@ -125,7 +125,7 @@ function metadata(filename::String)
     properties = Dict{String, Any}()
     metalst = get_elements_by_tagname(root(xml), "Image")
 
-    SizeC = get_size(oxr.reader, "C")
+    SizeC = get_size(oxr, "C")
 
     for a = attributes(metalst[1])
         push!(properties, "$(name(a))"=>value(a))
