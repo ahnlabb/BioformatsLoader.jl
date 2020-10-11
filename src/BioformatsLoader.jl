@@ -4,10 +4,10 @@ using LightXML
 using ImageMetadata
 
 export
-    set_id,
+    set_id!,
     OMEXMLReader,
     openbytes,
-    set_series,
+    set_series!,
     getpixeltype,
     open_img,
     bf_import,
@@ -17,62 +17,11 @@ export
 
 
 include("metadata.jl")
-
-const JServiceFactory = @jimport loci.common.services.ServiceFactory
-const JService = @jimport loci.common.services.Service
-const JIFormatReader = @jimport loci.formats.IFormatReader
-const JImageReader = @jimport loci.formats.ImageReader
-const JOMEXMLMetadata = @jimport loci.formats.ome.OMEXMLMetadata
-const JMetadataStore = @jimport loci.formats.meta.MetadataStore
-
-const datatypes = [Int8,UInt8,Int16,UInt16,Int32,UInt32,Float32,Float64,Bool]
-
-function create_service(classname::String)
-    factory = JServiceFactory(())
-    cls = classforname(classname)
-    service = jcall(factory, "getInstance", JService, (JClass,), cls)
-    return convert(JavaObject{Symbol(classname)}, service)
-end
-
-struct OMEXMLReader
-    reader::JavaObject
-    meta::JavaObject
-end
-
-function OMEXMLReader()
-    service = create_service("loci.formats.services.OMEXMLService")
-    meta = jcall(service, "createOMEXMLMetadata", JOMEXMLMetadata, ())
-    reader = convert(JIFormatReader, JImageReader(()))
-
-    jcall(reader, "setMetadataStore", Nothing, (JMetadataStore,), meta)
-    OMEXMLReader(reader, meta)
-end
-
-
-function set_id(oxr::OMEXMLReader, fname::AbstractString)
-    jcall(oxr.reader, "setId", Nothing, (JString,), string(fname))
-end
-
-function openbytes(oxr::OMEXMLReader, index::Int)
-    jcall(oxr.reader, "openBytes", Vector{jbyte}, (jint,), index)
-end
-
-function set_series(oxr::OMEXMLReader, index::Int)
-    jcall(oxr.reader, "setSeries", Nothing, (jint,), index)
-end
-
-function getpixeltype(oxr::OMEXMLReader)
-    id = jcall(oxr.reader, "getPixelType", jint, ())
-    return datatypes[id+1]
-end
-
-function islittleendian(oxr::OMEXMLReader)
-    jcall(oxr.reader, "isLittleEndian", jboolean, ())
-end
+include("omexmlreader.jl")
 
 function open_img(oxr::OMEXMLReader, index::Int)
-    sx = jcall(oxr.reader, "getSizeX", jint, ())
-    sy = jcall(oxr.reader, "getSizeY", jint, ())
+    sx = get_size(oxr, "X")
+    sy = get_size(oxr, "Y")
     arr = reinterpret(getpixeltype(oxr), openbytes(oxr, index))
     if islittleendian == 0
         @. arr = ntoh(arr)
@@ -82,18 +31,18 @@ end
 
 for F in (:open_stack, :bf_import, :metadata)
     @eval begin
-        function $F(fname::String, redirect::IO)
-            redirect_stdout(() -> $F(fname), redirect)
+        function $F(filename::String, redirect::IO)
+            redirect_stdout(() -> $F(filename), redirect)
         end
-        function $F(fname::String, show_output::Bool)
+        function $F(filename::String, show_output::Bool)
             if show_output
-                $F(fname)
+                $F(filename)
             else
                 STDOLD = stdout
                 local ret
                 redirect_stdout()
                 try
-                    ret = $F(fname)
+                    ret = $F(filename)
                 finally
                     redirect_stdout(STDOLD)
                 end
@@ -103,27 +52,25 @@ for F in (:open_stack, :bf_import, :metadata)
     end
 end
 
-function open_stack(fname::String)
-    oxr = OMEXMLReader()
-    set_id(oxr, fname)
+function open_stack(filename::String)
+    oxr = OMEXMLReader(filename)
     return open_stack(oxr)
 end
 
 function open_stack(oxr::OMEXMLReader; order="TZYXC")
-    image_order = jcall(oxr.reader, "getDimensionOrder", JString, ())
-    sizes = [jcall(oxr.reader, "getSize$d", jint, ()) for d in image_order]
+    image_order = get_dimension_order(oxr)
+    sizes = [get_size(oxr, d) for d in image_order]
     size_dict = Dict(zip(image_order, sizes))
 
-    for c in image_order
-        if !in(c, order)
-            @assert (size_dict[c] == 1) "Non-singleton dimension \"$c\" is not present in the requested image order \"$order\""
-            delete!(sizes_dict, c)
+    for d in image_order
+        if !in(d, order)
+            @assert (size_dict[d] == 1) "Non-singleton dimension \"$d\" is not present in the requested image order \"$order\""
         end
     end
 
     arr = openbytes(oxr, 0)
 
-    for i in 1:(prod(size_dict[d] for d in "TZC")-1)
+    for i in 1:(get_image_count(oxr) - 1)
         arr_nd = openbytes(oxr, i)
         append!(arr,arr_nd)
     end
@@ -133,22 +80,38 @@ function open_stack(oxr::OMEXMLReader; order="TZYXC")
     end
     arr = reinterpret(getpixeltype(oxr), arr)
 
-    im = reshape(arr, (sizes...,))
+    im = reshape(arr, ((size_dict[d] for d in image_order if in(d, order))...,))
     im = permutedims(im, [findfirst(c, image_order) for c in order])
 
     return im
 end
 
-function bf_import(fname::String; order="TZYXC")
-    oxr = OMEXMLReader()
-    set_id(oxr, fname)
-    xml = parse_string(jcall(oxr.meta, "dumpXML", JString, ()))
+"""
+    bf_import(filename::String; order::String="TZYXC", squeeze::Bool=false)
+
+Import all images and metadata in the file using Bio-Formats.
+
+The `order` keyword argument is the output order of dimensions, allowing you to
+reshuffle the dimensions of the images or skip singleton dimensions. Providing
+"CYX" for `order` gives you three-dimensional images in a "channels-first" data
+format but will fail with an error if any of the images in the file has a size
+greater than one in the `T` or `Z` dimension.
+
+By setting the `squeeze` keyword argument to `true` all singleton dimensions in
+the images will be dropped (even if they are in the `order` argument).
+"""
+function bf_import(filename::String; order="TZYXC", squeeze=false)
+    oxr = OMEXMLReader(filename)
+    xml = get_xml(oxr)
     images = Array{ImageMeta,1}()
 
     metalst = get_elements_by_tagname(root(xml), "Image")
     for i = 1:length(metalst)
-        set_series(oxr, i-1)
-        img = open_stack(oxr; order = "TZYXC")
+        set_series!(oxr, i-1)
+        img = open_stack(oxr; order = order)
+        if squeeze
+            img = dropdims(img; dims=((i for i in 1:ndims(img) if size(img, i) == 1)...,))
+        end
         properties = xml_to_dict(metalst[i])
         push!(images, ImageMeta(img, properties))
     end
@@ -156,14 +119,13 @@ function bf_import(fname::String; order="TZYXC")
     return images
 end
 
-function metadata(fname::String)
-    oxr = OMEXMLReader()
-    set_id(oxr, fname)
-    xml = parse_string(jcall(oxr.meta, "dumpXML", JString, ()))
+function metadata(filename::String)
+    oxr = OMEXMLReader(filename)
+    xml = get_xml(oxr)
     properties = Dict{String, Any}()
     metalst = get_elements_by_tagname(root(xml), "Image")
 
-    SizeC = jcall(oxr.reader, "getSizeC", jint, ())
+    SizeC = get_size(oxr.reader, "C")
 
     for a = attributes(metalst[1])
         push!(properties, "$(name(a))"=>value(a))
