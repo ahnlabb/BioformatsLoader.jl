@@ -12,12 +12,12 @@ Depends on `bioformats_package.jar`
 
 ```julia
 import Pkg
-Pkg.add(Pkg.PackageSpec(url="https://github.com/ahnlabb/BioformatsLoader.jl"))
+Pkg.add("BioformatsLoader")
 ```
 
 Inside the Julia interactive REPL, you can also use
 ```julia
-julia>]add https://github.com/ahnlabb/BioformatsLoader.jl
+julia>]add BioformatsLoader
 ```
 
 ## Build Process
