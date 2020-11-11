@@ -10,15 +10,16 @@ function xml_to_dict(node::XMLElement; path="")
     end
     for n=child_elements(node)
         nxt = xml_to_dict(n)
-        if name(n) in keys(dict)
-            cur = dict[Symbol(name(n))]
+        key = Symbol(name(n))
+        if key in keys(dict)
+            cur = dict[key]
             if cur isa Array
                 push!(cur, nxt)
             else
-                dict[Symbol(name(n))] = [cur, nxt]
+                dict[key] = [cur, nxt]
             end
         else
-            dict[Symbol(name(n))] = nxt
+            dict[key] = nxt
         end
     end
     return dict
