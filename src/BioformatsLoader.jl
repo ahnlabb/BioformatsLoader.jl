@@ -100,7 +100,7 @@ greater than one in the `T` or `Z` dimension.
 By setting the `squeeze` keyword argument to `true` all singleton dimensions in
 the images will be dropped (even if they are in the `order` argument).
 """
-function bf_import(filename::String; order="TZYXC", squeeze=false)
+function bf_import(filename::String; order="TZYXC", squeeze=false, gray=false)
     oxr = OMEXMLReader(filename)
     xml = get_xml(oxr)
     images = Array{ImageMeta,1}()
@@ -112,11 +112,24 @@ function bf_import(filename::String; order="TZYXC", squeeze=false)
         if squeeze
             img = dropdims(img; dims=((i for i in 1:ndims(img) if size(img, i) == 1)...,))
         end
+        if gray
+            img = as_gray(img)
+        end
         properties = xml_to_dict(metalst[i])
         push!(images, ImageMeta(img, properties))
     end
 
     return images
+end
+
+function as_gray(arr::A) where A <: AbstractArray{T} where T <: Unsigned
+    Gray.(reinterpret.(Normed{T, sizeof(T)*8}, arr))
+end
+function as_gray(arr::A) where A <: AbstractArray{T} where T <: AbstractFloat
+    Gray.(arr)
+end
+function as_gray(arr::A) where A <: AbstractArray{Bool}
+    Gray.(arr)
 end
 
 function metadata(filename::String)
