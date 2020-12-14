@@ -2,6 +2,7 @@ module BioformatsLoader
 using JavaCall
 using LightXML
 using ImageMetadata
+using ImageCore
 
 export
     set_id!,
