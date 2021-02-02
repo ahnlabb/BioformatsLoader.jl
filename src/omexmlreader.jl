@@ -28,6 +28,17 @@ function OMEXMLReader()
     OMEXMLReader(reader, meta)
 end
 
+function OMEXMLReader(f::Function, filename::String)
+    oxr = OMEXMLReader(filename)
+    try
+        f(oxr)
+    finally
+        close(oxr)
+    end
+end
+
+Base.close(oxr::OMEXMLReader) = jcall(oxr.reader, "close", Nothing, ())
+
 function OMEXMLReader(filename::String)
     oxr = OMEXMLReader()
     set_id!(oxr, filename)
