@@ -1,6 +1,6 @@
 name = "BioformatsLoader"
 uuid = "d1f74bce-bb60-11ea-2eff-3d75f256b4d8"
-version = "0.1.0"
+version = "0.2.0"
 
 [deps]
 ImageCore = "a09fc81d-aa75-5fe9-8630-4744c3626534"
