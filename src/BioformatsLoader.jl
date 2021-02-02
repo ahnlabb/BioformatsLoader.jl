@@ -1,5 +1,6 @@
 module BioformatsLoader
 using JavaCall
+import JavaCall.JNI
 using LightXML
 using ImageMetadata
 using ImageCore

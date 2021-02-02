@@ -45,12 +45,23 @@ function OMEXMLReader(filename::String)
     oxr
 end
 
+function local_frame(f::Function; capacity=16)
+    JNI.PushLocalFrame(jint(capacity))
+    try
+        f()
+    finally
+        JNI.PopLocalFrame(C_NULL)
+    end
+end
+
 function set_id!(oxr::OMEXMLReader, filename::AbstractString)
     jcall(oxr.reader, "setId", Nothing, (JString,), string(filename))
 end
 
 function openbytes(oxr::OMEXMLReader, index::Int)
-    jcall(oxr.reader, "openBytes", Vector{jbyte}, (jint,), index)
+    local_frame() do
+        jcall(oxr.reader, "openBytes", Vector{jbyte}, (jint,), index)
+    end
 end
 
 function set_series!(oxr::OMEXMLReader, index::Int)
