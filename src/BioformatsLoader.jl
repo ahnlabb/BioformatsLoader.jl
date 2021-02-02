@@ -54,8 +54,7 @@ for F in (:open_stack, :bf_import, :metadata)
 end
 
 function open_stack(filename::String)
-    oxr = OMEXMLReader(filename)
-    return open_stack(oxr)
+    OMEXMLReader(open_stack, filename)
 end
 
 function open_stack(oxr::OMEXMLReader; order="TZYXC")
@@ -102,25 +101,26 @@ By setting the `squeeze` keyword argument to `true` all singleton dimensions in
 the images will be dropped (even if they are in the `order` argument).
 """
 function bf_import(filename::String; order="TZYXC", squeeze=false, gray=false)
-    oxr = OMEXMLReader(filename)
-    xml = get_xml(oxr)
-    images = Array{ImageMeta,1}()
+    OMEXMLReader(filename) do oxr
+        xml = get_xml(oxr)
+        images = Array{ImageMeta,1}()
 
-    metalst = get_elements_by_tagname(root(xml), "Image")
-    for i = 1:length(metalst)
-        set_series!(oxr, i-1)
-        img = open_stack(oxr; order = order)
-        if squeeze
-            img = dropdims(img; dims=((i for i in 1:ndims(img) if size(img, i) == 1)...,))
+        metalst = get_elements_by_tagname(root(xml), "Image")
+        for i = 1:length(metalst)
+            set_series!(oxr, i-1)
+            img = open_stack(oxr; order = order)
+            if squeeze
+                img = dropdims(img; dims=((i for i in 1:ndims(img) if size(img, i) == 1)...,))
+            end
+            if gray
+                img = as_gray(img)
+            end
+            properties = xml_to_dict(metalst[i])
+            push!(images, ImageMeta(img, properties))
         end
-        if gray
-            img = as_gray(img)
-        end
-        properties = xml_to_dict(metalst[i])
-        push!(images, ImageMeta(img, properties))
+
+        return images
     end
-
-    return images
 end
 
 function as_gray(arr::A) where A <: AbstractArray{T} where T <: Unsigned
@@ -134,32 +134,34 @@ function as_gray(arr::A) where A <: AbstractArray{Bool}
 end
 
 function metadata(filename::String)
-    oxr = OMEXMLReader(filename)
-    xml = get_xml(oxr)
-    properties = Dict{String, Any}()
-    metalst = get_elements_by_tagname(root(xml), "Image")
+    OMEXMLReader(filename) do oxr
+        xml = get_xml(oxr)
+        properties = Dict{String, Any}()
+        metalst = get_elements_by_tagname(root(xml), "Image")
 
-    SizeC = get_size(oxr.reader, "C")
+        SizeC = get_size(oxr.reader, "C")
 
-    for a = attributes(metalst[1])
-        push!(properties, "$(name(a))"=>value(a))
-    end
-    for a = attributes(find_element(metalst[1], "Pixels"))
-        try
-            push!(properties, "$(name(a))"=> parse(Float64, value(a)))
-        catch ex
-            if ex isa ArgumentError
-                push!(properties, "$(name(a))"=>  value(a))
+        for a = attributes(metalst[1])
+            push!(properties, "$(name(a))"=>value(a))
+        end
+        for a = attributes(find_element(metalst[1], "Pixels"))
+            try
+                push!(properties, "$(name(a))"=> parse(Float64, value(a)))
+            catch ex
+                if ex isa ArgumentError
+                    push!(properties, "$(name(a))"=>  value(a))
+                end
             end
         end
-    end
 
-    for i in 1:SizeC
-        for a in attributes(metalst[1]["Pixels"][1]["Channel"][i])
-            if name(a)== "EmissionWavelength"
-                push!(properties, "channel_$i"=>value(a))
+        for i in 1:SizeC
+            for a in attributes(metalst[1]["Pixels"][1]["Channel"][i])
+                if name(a)== "EmissionWavelength"
+                    push!(properties, "channel_$i"=>value(a))
+                end
             end
         end
+        properties
     end
 end
 
