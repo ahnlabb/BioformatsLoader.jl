@@ -4,6 +4,7 @@ import JavaCall.JNI
 using LightXML
 using ImageMetadata
 using ImageCore
+using Downloads
 
 export
     set_id!,
@@ -101,7 +102,7 @@ greater than one in the `T` or `Z` dimension.
 By setting the `squeeze` keyword argument to `true` all singleton dimensions in
 the images will be dropped (even if they are in the `order` argument).
 """
-function bf_import(filename::String; order="TZYXC", squeeze=false, gray=false)
+function bf_import(filename::AbstractString; order="TZYXC", squeeze=false, gray=false)
     OMEXMLReader(filename) do oxr
         xml = get_xml(oxr)
         images = Array{ImageMeta,1}()
@@ -121,6 +122,25 @@ function bf_import(filename::String; order="TZYXC", squeeze=false, gray=false)
         end
 
         return images
+    end
+end
+
+"""
+    bf_import_url(url::AbstractString, [ filename::AbstractString ]; kwargs...)
+
+Download and import an image using Bio-Formats.
+"""
+function bf_import_url(url::AbstractString; kwargs...)
+    url_match = match(r"[^?]*/([^/?]+)\??.*$", url)
+    @assert !isnothing(url_match) "Could not determine filename from URL"
+    bf_import_url(url, url_match.captures[1]; kwargs...)
+end
+
+function bf_import_url(url::AbstractString, filename::AbstractString; kwargs...)
+    mktempdir() do path
+        imgpath = joinpath(path, filename)
+        Downloads.download(url, imgpath)
+        bf_import(imgpath; kwargs...)
     end
 end
 
