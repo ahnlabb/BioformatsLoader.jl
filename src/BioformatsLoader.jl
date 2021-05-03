@@ -24,11 +24,8 @@ include("omexmlreader.jl")
 function open_img(oxr::OMEXMLReader, index::Int)
     sx = get_size(oxr, "X")
     sy = get_size(oxr, "Y")
-    arr = reinterpret(getpixeltype(oxr), openbytes(oxr, index))
-    if islittleendian == 0
-        @. arr = ntoh(arr)
-    end
-    return reshape(arr, (sx, sy))
+    arr = openbytes(oxr, index)
+    return interpret_blob!(oxr, arr, (sx, sy))
 end
 
 for F in (:open_stack, :bf_import, :metadata)
@@ -58,6 +55,14 @@ function open_stack(filename::String)
     OMEXMLReader(open_stack, filename)
 end
 
+function interpret_blob!(oxr, arr, sizes)
+    arr = reinterpret(getpixeltype(oxr), arr)
+    if !islittleendian(oxr)
+        @. arr = ntoh(arr)
+    end
+    return reshape(arr, sizes)
+end
+
 function open_stack(oxr::OMEXMLReader; order="TZYXC")
     image_order = get_dimension_order(oxr)
     sizes = [get_size(oxr, d) for d in image_order]
@@ -76,19 +81,14 @@ function open_stack(oxr::OMEXMLReader; order="TZYXC")
         append!(arr,arr_nd)
     end
 
-    if islittleendian == 0
-        @. arr = ntoh(arr)
-    end
-    arr = reinterpret(getpixeltype(oxr), arr)
-
-    im = reshape(arr, ((size_dict[d] for d in image_order if in(d, order))...,))
+    im = interpret_blob!(oxr, arr, ((size_dict[d] for d in image_order if in(d, order))...,))
     im = permutedims(im, [findfirst(c, image_order) for c in order])
 
     return im
 end
 
 """
-    bf_import(filename::String; order::String="TZYXC", squeeze::Bool=false)
+    bf_import(filename::AbstractString; order::AbstractString="TZYXC", squeeze::Bool=false)
 
 Import all images and metadata in the file using Bio-Formats.
 

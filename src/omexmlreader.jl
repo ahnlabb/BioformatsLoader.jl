@@ -74,7 +74,7 @@ function getpixeltype(oxr::OMEXMLReader)
 end
 
 function islittleendian(oxr::OMEXMLReader)
-    jcall(oxr.reader, "isLittleEndian", jboolean, ())
+    Bool(jcall(oxr.reader, "isLittleEndian", jboolean, ()))
 end
 
 function get_dimension_order(oxr)
