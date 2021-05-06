@@ -3,6 +3,7 @@ uuid = "d1f74bce-bb60-11ea-2eff-3d75f256b4d8"
 version = "0.2.1"
 
 [deps]
+Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 ImageCore = "a09fc81d-aa75-5fe9-8630-4744c3626534"
 ImageMetadata = "bc367c6b-8a6b-528e-b4bd-a4b897500b49"
 JavaCall = "494afd89-becb-516b-aafa-70d2670c0337"
