@@ -1,13 +1,15 @@
 name = "BioformatsLoader"
 uuid = "d1f74bce-bb60-11ea-2eff-3d75f256b4d8"
-version = "0.2.1"
+version = "0.3.0"
 
 [deps]
+AxisArrays = "39de3d68-74b9-583c-8d2d-e117c070f3a9"
 Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 ImageCore = "a09fc81d-aa75-5fe9-8630-4744c3626534"
 ImageMetadata = "bc367c6b-8a6b-528e-b4bd-a4b897500b49"
 JavaCall = "494afd89-becb-516b-aafa-70d2670c0337"
 LightXML = "9c8b4983-aa76-5018-a973-4c85ecc9e179"
+URIs = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
 
 [compat]
 ImageCore = "0.8"

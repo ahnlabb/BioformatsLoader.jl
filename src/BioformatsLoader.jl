@@ -3,6 +3,8 @@ using JavaCall
 import JavaCall.JNI
 using LightXML
 using ImageMetadata
+using AxisArrays
+using URIs
 using ImageCore
 using Downloads
 
@@ -16,11 +18,20 @@ export
     bf_import,
     open_stack,
     metadata,
-    arraydata
+    arraydata,
+    axisnames
 
 
 include("metadata.jl")
 include("omexmlreader.jl")
+
+const scheme2importer = Dict{String, Any}()
+
+function add_importer(importer, schemes)
+    for s in schemes
+        scheme2importer[s] = importer
+    end
+end
 
 function open_img(oxr::OMEXMLReader, index::Int)
     sx = get_size(oxr, "X")
@@ -66,6 +77,10 @@ end
 
 function open_stack(oxr::OMEXMLReader; order="TZYXC")
     image_order = get_dimension_order(oxr)
+    if isinterleaved(oxr)
+        image_order = replace(image_order, "XYC" => "CXY")
+    end
+
     sizes = [get_size(oxr, d) for d in image_order]
     size_dict = Dict(zip(image_order, sizes))
 
@@ -85,11 +100,11 @@ function open_stack(oxr::OMEXMLReader; order="TZYXC")
     im = interpret_blob!(oxr, arr, ((size_dict[d] for d in image_order if in(d, order))...,))
     im = permutedims(im, [findfirst(c, image_order) for c in order])
 
-    return im
+    return AxisArray(im, (Symbol(d) for d in order)...)
 end
 
 """
-    bf_import(filename::AbstractString; order::AbstractString="TZYXC", squeeze::Bool=false)
+    bf_import(uri::AbstractString; order::AbstractString="TZYXC", squeeze::Bool=false)
 
 Import all images and metadata in the file using Bio-Formats.
 
@@ -102,7 +117,13 @@ greater than one in the `T` or `Z` dimension.
 By setting the `squeeze` keyword argument to `true` all singleton dimensions in
 the images will be dropped (even if they are in the `order` argument).
 """
-function bf_import(filename::AbstractString; order="TZYXC", squeeze=false, gray=false)
+function bf_import(uri; kwargs...)
+    u = URI(uri)
+    scheme2importer[u.scheme](u; kwargs...)
+end
+
+bf_import_file(uri::URI; kwargs...) = bf_import_file(uri.path; kwargs...)
+function bf_import_file(filename::AbstractString; order="CYXZT", squeeze=false, gray=false)
     OMEXMLReader(filename) do oxr
         xml = get_xml(oxr)
         images = Array{ImageMeta,1}()
@@ -118,6 +139,7 @@ function bf_import(filename::AbstractString; order="TZYXC", squeeze=false, gray=
                 img = as_gray(img)
             end
             properties = xml_to_dict(metalst[i])
+            properties[:ImportOrder] = axisnames(img)
             push!(images, ImageMeta(img, properties))
         end
 
@@ -125,33 +147,39 @@ function bf_import(filename::AbstractString; order="TZYXC", squeeze=false, gray=
     end
 end
 
+add_importer(bf_import_file, ["", "file"])
+
 """
-    bf_import_url(url::AbstractString, [ filename::AbstractString ]; kwargs...)
+    bf_import_http(url::AbstractString, [ filename::AbstractString ]; kwargs...)
 
 Download and import an image using Bio-Formats.
 """
-function bf_import_url(url::AbstractString; kwargs...)
-    url_match = match(r"[^?]*/([^/?]+)\??.*$", url)
-    @assert !isnothing(url_match) "Could not determine filename from URL"
-    bf_import_url(url, url_match.captures[1]; kwargs...)
+bf_import_http(url::AbstractString, args...; kwargs...) = bf_import_http(URI(url), args...; kwargs...)
+
+function bf_import_http(url::URI; kwargs...)
+    filename = basename(url.path)
+    @assert (filename != "") "Could not determine filename from URL"
+    bf_import_http(url, filename; kwargs...)
 end
 
-function bf_import_url(url::AbstractString, filename::AbstractString; kwargs...)
+function bf_import_http(url::URI, filename::AbstractString; kwargs...)
     mktempdir() do path
         imgpath = joinpath(path, filename)
-        Downloads.download(url, imgpath)
+        Downloads.download(string(url), imgpath)
         bf_import(imgpath; kwargs...)
     end
 end
 
+add_importer(bf_import_http, ["http", "https"])
+
 function as_gray(arr::A) where A <: AbstractArray{T} where T <: Unsigned
-    Gray.(reinterpret.(Normed{T, sizeof(T)*8}, arr))
+    map(x -> Gray(reinterpret(Normed{T, sizeof(T)*8}, x)), arr)
 end
 function as_gray(arr::A) where A <: AbstractArray{T} where T <: AbstractFloat
-    Gray.(arr)
+    map(Gray, arr)
 end
 function as_gray(arr::A) where A <: AbstractArray{Bool}
-    Gray.(arr)
+    map(Gray, arr)
 end
 
 function metadata(filename::String)

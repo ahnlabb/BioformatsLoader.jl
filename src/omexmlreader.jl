@@ -17,18 +17,19 @@ end
 struct OMEXMLReader
     reader::JavaObject
     meta::JavaObject
+
+    function OMEXMLReader()
+        service = create_service("loci.formats.services.OMEXMLService")
+        meta = jcall(service, "createOMEXMLMetadata", JOMEXMLMetadata, ())
+        reader = convert(JIFormatReader, JImageReader(()))
+
+        jcall(reader, "setMetadataStore", Nothing, (JMetadataStore,), meta)
+        new(reader, meta)
+    end
 end
 
-function OMEXMLReader()
-    service = create_service("loci.formats.services.OMEXMLService")
-    meta = jcall(service, "createOMEXMLMetadata", JOMEXMLMetadata, ())
-    reader = convert(JIFormatReader, JImageReader(()))
 
-    jcall(reader, "setMetadataStore", Nothing, (JMetadataStore,), meta)
-    OMEXMLReader(reader, meta)
-end
-
-function OMEXMLReader(f::Function, filename::String)
+function OMEXMLReader(f::Function, filename::AbstractString)
     oxr = OMEXMLReader(filename)
     try
         f(oxr)
@@ -39,7 +40,7 @@ end
 
 Base.close(oxr::OMEXMLReader) = jcall(oxr.reader, "close", Nothing, ())
 
-function OMEXMLReader(filename::String)
+function OMEXMLReader(filename::AbstractString)
     oxr = OMEXMLReader()
     set_id!(oxr, filename)
     oxr
@@ -75,6 +76,10 @@ end
 
 function islittleendian(oxr::OMEXMLReader)
     Bool(jcall(oxr.reader, "isLittleEndian", jboolean, ()))
+end
+
+function isinterleaved(oxr::OMEXMLReader)
+    Bool(jcall(oxr.reader, "isInterleaved", jboolean, ()))
 end
 
 function get_dimension_order(oxr)
