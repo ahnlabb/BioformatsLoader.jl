@@ -75,7 +75,7 @@ function interpret_blob!(oxr, arr, sizes)
     return reshape(arr, sizes)
 end
 
-function open_stack(oxr::OMEXMLReader; order="TZYXC")
+function open_stack(oxr::OMEXMLReader; order="CYXZT")
     image_order = get_dimension_order(oxr)
     if isinterleaved(oxr)
         image_order = replace(image_order, "XYC" => "CXY")
