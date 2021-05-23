@@ -10,7 +10,7 @@ oxr = OMEXMLReader()
 @test !JavaCall.isnull(oxr.reader)
 @test !JavaCall.isnull(oxr.meta)
 
-ome_imgs_url = "https://downloads.openmicroscopy.org/images/"
+ome_imgs_url = "https://downloads.openmicroscopy.org/images"
 
 ome_paths =
     Dict(
@@ -23,7 +23,7 @@ ome_paths =
 test_slice = (Axis{:T}(1), Axis{:Z}(1), Axis{:C}(1), Axis{:X}(1), Axis{:Y}(:))
 for (fmt, paths) in ome_paths
     for p in paths
-        url = joinpath(ome_imgs_url, fmt, p)
+        url = "$(ome_imgs_url)/$(fmt)/$(p)"
         imgs = bf_import(url)
         @test length(imgs) > 0
 
