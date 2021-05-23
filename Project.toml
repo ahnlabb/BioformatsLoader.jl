@@ -9,15 +9,16 @@ ImageCore = "a09fc81d-aa75-5fe9-8630-4744c3626534"
 ImageMetadata = "bc367c6b-8a6b-528e-b4bd-a4b897500b49"
 JavaCall = "494afd89-becb-516b-aafa-70d2670c0337"
 LightXML = "9c8b4983-aa76-5018-a973-4c85ecc9e179"
+Logging = "56ddb016-857b-54e1-b83d-db4d58db5568"
 URIs = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
 
 [compat]
+AxisArrays = "0.4"
 ImageCore = "0.8"
 ImageMetadata = "0.7, 0.8, 0.9"
 JavaCall = "0.7, 0.8"
 LightXML = "0.8, 0.9"
 URIs = "1"
-AxisArrays = "0.4"
 julia = "1"
 
 [extras]

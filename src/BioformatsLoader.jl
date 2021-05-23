@@ -7,6 +7,7 @@ using AxisArrays
 using URIs
 using ImageCore
 using Downloads
+using Logging
 
 export
     set_id!,
@@ -119,7 +120,14 @@ the images will be dropped (even if they are in the `order` argument).
 """
 function bf_import(uri; kwargs...)
     u = URI(uri)
-    scheme2importer[u.scheme](u; kwargs...)
+    if u.scheme in keys(scheme2importer)
+        scheme2importer[u.scheme](u; kwargs...)
+    else
+        if length(u.scheme) > 1
+            @warn "Unrecognized scheme \"$(u.scheme)\", attempting to open as file"
+        end
+        bf_import_file(uri; kwargs...)
+    end
 end
 
 bf_import_file(uri::URI; kwargs...) = bf_import_file(uri.path; kwargs...)
@@ -166,7 +174,7 @@ function bf_import_http(url::URI, filename::AbstractString; kwargs...)
     mktempdir() do path
         imgpath = joinpath(path, filename)
         Downloads.download(string(url), imgpath)
-        bf_import(imgpath; kwargs...)
+        bf_import_file(imgpath; kwargs...)
     end
 end
 
