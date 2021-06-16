@@ -155,7 +155,7 @@ function bf_import_file(filename::AbstractString; order="CYXZT", squeeze=false, 
     end
 end
 
-add_importer(bf_import_file, ["", "file"])
+add_importer(bf_import_file, ["file"])
 
 """
     bf_import_http(url::AbstractString, [ filename::AbstractString ]; kwargs...)

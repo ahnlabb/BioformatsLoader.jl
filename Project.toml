@@ -1,6 +1,6 @@
 name = "BioformatsLoader"
 uuid = "d1f74bce-bb60-11ea-2eff-3d75f256b4d8"
-version = "0.3.1"
+version = "0.3.2"
 
 [deps]
 AxisArrays = "39de3d68-74b9-583c-8d2d-e117c070f3a9"
