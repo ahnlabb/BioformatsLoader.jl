@@ -211,10 +211,12 @@ function metadata(filename::String)
             end
         end
 
-        for i in 1:SizeC
-            for a in attributes(metalst[1]["Pixels"][1]["Channel"][i])
-                if name(a)== "EmissionWavelength"
-                    push!(properties, "channel_$i"=>value(a))
+        if length(metalst[1]["Pixels"][1]["Channel"]) == SizeC
+            for i in 1:SizeC
+                for a in attributes(metalst[1]["Pixels"][1]["Channel"][i])
+                    if name(a)== "EmissionWavelength"
+                        push!(properties, "channel_$i"=>value(a))
+                    end
                 end
             end
         end
