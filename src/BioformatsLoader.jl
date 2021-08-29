@@ -220,7 +220,6 @@ function metadata(filename::String)
         end
         properties
     end
-    properties
 end
 
 const levels = ["ALL", "DEBUG", "ERROR", "FATAL", "INFO", "OFF", "TRACE", "WARN"]
