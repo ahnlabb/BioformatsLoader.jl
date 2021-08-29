@@ -38,6 +38,7 @@ for (fmt, paths) in ome_paths
                 @test img.ImportOrder == import_order
                 @test arraydata(img[test_slice...]) == arraydata(imgs[1][test_slice...])
             end
+            @test metadata(imgpath) isa Dict{String,Any}
         end
     end
 end
