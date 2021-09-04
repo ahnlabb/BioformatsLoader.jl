@@ -14,7 +14,7 @@ URIs = "5c2747f8-b7ea-4ff2-ba2e-563bfd36b1d4"
 
 [compat]
 AxisArrays = "0.4"
-ImageCore = "0.8"
+ImageCore = "0.8, 0.9"
 ImageMetadata = "0.7, 0.8, 0.9"
 JavaCall = "0.7, 0.8"
 LightXML = "0.8, 0.9"
