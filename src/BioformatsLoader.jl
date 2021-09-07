@@ -238,9 +238,10 @@ let initialized = Ref(false)
     function init(;memory=1024::Int,log_level::String="ERROR")
         if !initialized[]
             bfpkg_path = get_bf_path()
-            JavaCall.init(["-ea", "-Xmx$(memory)M", "-Djava.class.path=$bfpkg_path"])
+            JavaCall.init(["-ea", "-Xrs", "-Xmx$(memory)M", "-Djava.class.path=$bfpkg_path"])
             enableLogging(log_level) || @warn "Could not enable logging."
             initialized[] = true
+            atexit(JavaCall.destroy)
         else
             @warn "BioformatsLoader already initialized"
         end
