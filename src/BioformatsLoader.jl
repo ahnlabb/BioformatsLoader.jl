@@ -242,7 +242,7 @@ function __init__()
 end
 
 let initialized = Ref(false)
-    global init
+    global init, ensure_init
     function init(;memory=1024::Int,log_level::String="ERROR")
         if !initialized[]
             if !JavaCall.isloaded()
@@ -259,6 +259,7 @@ let initialized = Ref(false)
         end
         nothing
     end
+    ensure_init() = initialized[] ? nothing : init()
 end
 
 end
