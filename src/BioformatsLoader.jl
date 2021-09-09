@@ -233,20 +233,36 @@ end
 
 get_bf_path() = joinpath(dirname(@__DIR__), "deps", "bioformats_package.jar")
 
+function set_memory(memory=1024)
+    if memory > 0
+        # There should be a distinct memory option in JavaCall
+        # Find other memory options and delete them
+        for opt in JavaCall.opts
+            if startswith(opt, "-Xmx")
+                delete!(JavaCall.opts, opt)
+            end
+        end
+        # Add a new option as specified
+        JavaCall.addOpts("-Xmx$(memory)M")
+    end
+    nothing
+end
+
 function __init__()
     # Configure JavaCall and JVM
     bfpkg_path = get_bf_path()
     JavaCall.addOpts("-ea")
     JavaCall.addOpts("-Xrs")
+    set_memory()
     JavaCall.addClassPath(bfpkg_path)
 end
 
 let initialized = Ref(false)
     global init, ensure_init
-    function init(;memory=1024::Int,log_level::String="ERROR")
+    function init(;memory::Int=-1, log_level::String="ERROR")
         if !initialized[]
             if !JavaCall.isloaded()
-                JavaCall.addOpts("-Xmx$(memory)M")
+                set_memory(memory)
                 JavaCall.init()
                 atexit(JavaCall.destroy)
             else
