@@ -233,15 +233,27 @@ end
 
 get_bf_path() = joinpath(dirname(@__DIR__), "deps", "bioformats_package.jar")
 
+function __init__()
+    # Configure JavaCall and JVM
+    bfpkg_path = get_bf_path()
+    JavaCall.addOpts("-ea")
+    JavaCall.addOpts("-Xrs")
+    JavaCall.addClassPath(bfpkg_path)
+end
+
 let initialized = Ref(false)
     global init
     function init(;memory=1024::Int,log_level::String="ERROR")
         if !initialized[]
-            bfpkg_path = get_bf_path()
-            JavaCall.init(["-ea", "-Xrs", "-Xmx$(memory)M", "-Djava.class.path=$bfpkg_path"])
-            enableLogging(log_level) || @warn "Could not enable logging."
+            if !JavaCall.isloaded()
+                JavaCall.addOpts("-Xmx$(memory)M")
+                JavaCall.init()
+                atexit(JavaCall.destroy)
+            else
+                @warn "JavaCall already initialized"
+            end
             initialized[] = true
-            atexit(JavaCall.destroy)
+            enableLogging(log_level) || @warn "Could not enable logging."
         else
             @warn "BioformatsLoader already initialized"
         end
