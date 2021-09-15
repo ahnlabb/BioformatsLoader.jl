@@ -237,11 +237,7 @@ function set_memory(memory=1024)
     if memory > 0
         # There should be a distinct memory option in JavaCall
         # Find other memory options and delete them
-        for opt in JavaCall.opts
-            if startswith(opt, "-Xmx")
-                delete!(JavaCall.opts, opt)
-            end
-        end
+        filter!(!startswith("-Xmx"), JavaCall.opts)
         # Add a new option as specified
         JavaCall.addOpts("-Xmx$(memory)M")
     end
