@@ -19,6 +19,8 @@ struct OMEXMLReader
     meta::JavaObject
 
     function OMEXMLReader()
+        # Make sure JavaCall and logger have been initialized
+        ensure_init()
         service = create_service("loci.formats.services.OMEXMLService")
         meta = jcall(service, "createOMEXMLMetadata", JOMEXMLMetadata, ())
         reader = convert(JIFormatReader, JImageReader(()))

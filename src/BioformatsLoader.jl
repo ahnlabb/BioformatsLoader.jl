@@ -233,20 +233,45 @@ end
 
 get_bf_path() = joinpath(dirname(@__DIR__), "deps", "bioformats_package.jar")
 
+function set_memory(memory=1024)
+    if memory > 0
+        # There should be a distinct memory option in JavaCall
+        # Find other memory options and delete them
+        filter!(opt -> !startswith(opt, "-Xmx"), JavaCall.opts)
+        # Add a new option as specified
+        JavaCall.addOpts("-Xmx$(memory)M")
+    end
+    nothing
+end
+
+function __init__()
+    # Configure JavaCall and JVM
+    bfpkg_path = get_bf_path()
+    JavaCall.addOpts("-ea")
+    JavaCall.addOpts("-Xrs")
+    set_memory()
+    JavaCall.addClassPath(bfpkg_path)
+end
+
 let initialized = Ref(false)
-    global init
-    function init(;memory=1024::Int,log_level::String="ERROR")
+    global init, ensure_init
+    function init(;memory::Int=-1, log_level::String="ERROR")
         if !initialized[]
-            bfpkg_path = get_bf_path()
-            JavaCall.init(["-ea", "-Xrs", "-Xmx$(memory)M", "-Djava.class.path=$bfpkg_path"])
-            enableLogging(log_level) || @warn "Could not enable logging."
+            if !JavaCall.isloaded()
+                set_memory(memory)
+                JavaCall.init()
+                atexit(JavaCall.destroy)
+            else
+                @warn "JavaCall already initialized"
+            end
             initialized[] = true
-            atexit(JavaCall.destroy)
+            enableLogging(log_level) || @warn "Could not enable logging."
         else
             @warn "BioformatsLoader already initialized"
         end
         nothing
     end
+    ensure_init() = initialized[] ? nothing : init()
 end
 
 end

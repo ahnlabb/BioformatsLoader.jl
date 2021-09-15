@@ -4,7 +4,15 @@ using Test
 using Downloads
 using AxisArrays
 
-@test BioformatsLoader.init() == nothing
+# Test initialization
+@test length(JavaCall.opts) >= 3
+@test sum(startswith.(JavaCall.opts, "-Xmx")) == 1
+@test BioformatsLoader.set_memory(1025) === nothing
+@test sum(startswith.(JavaCall.opts, "-Xmx")) == 1
+@test BioformatsLoader.ensure_init() === nothing
+@test_logs (:warn, "BioformatsLoader already initialized") BioformatsLoader.init()
+@test BioformatsLoader.ensure_init() === nothing
+@test endswith(JavaCall.getClassPath(), "bioformats_package.jar")
 
 oxr = OMEXMLReader()
 @test !JavaCall.isnull(oxr.reader)
@@ -15,7 +23,7 @@ openjpeg_imgs_url = "https://github.com/uclouvain/openjpeg-data/raw/master/input
 mktempdir() do path
     for file in ("file2.jp2",)
         imgpath = joinpath(path, file)
-        Downloads.download(joinpath(openjpeg_imgs_url, file), imgpath)
+        Downloads.download(join((openjpeg_imgs_url, file), "/"), imgpath)
         md = metadata(imgpath)
         @test md["SizeC"] == 3
         @test md["Type"] == "uint8"
