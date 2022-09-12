@@ -76,7 +76,32 @@ function interpret_blob!(oxr, arr, sizes)
     return reshape(arr, sizes)
 end
 
-function open_stack(oxr::OMEXMLReader; order="CYXZT")
+function no_colon(sz, subidx)
+    ntuple((d)->typeof(subidx[d]) == Colon ? (1:sz[d]) : 
+            ((typeof(subidx[d]) <: Number) ? (subidx[d]:subidx[d]) : subidx[d]), length(sz))
+end
+
+function sub_indices(sz, subidx)
+    CartesianIndices(no_colon(sz, subidx))
+end
+
+function clipped_size(sz, subidx)
+    return size(sub_indices(sz, subidx))
+end
+
+function openbytes(oxr, idx, fsubidx, raw_size)
+    arr_nd = openbytes(oxr, idx)
+    arr_nd = reinterpret(getpixeltype(oxr), arr_nd)
+    if all(typeof.(fsubidx) .== Colon)
+        return arr_nd[:]
+    else
+        rv = reshape(arr_nd, raw_size)
+        return (rv[fsubidx...])[:]
+    end
+end
+
+
+function open_stack(oxr::OMEXMLReader; subidx=nothing, order="CYXZT")
     image_order = get_dimension_order(oxr)
     if isinterleaved(oxr)
         image_order = replace(image_order, "XYC" => "CXY")
@@ -91,14 +116,41 @@ function open_stack(oxr::OMEXMLReader; order="CYXZT")
         end
     end
 
-    arr = openbytes(oxr, 0)
-
-    for i in 1:(get_image_count(oxr) - 1)
-        arr_nd = openbytes(oxr, i)
-        append!(arr,arr_nd)
+    num_imgs = get_image_count(oxr)
+    trail_size=1;
+    trail_dim=length(image_order)
+    for d=length(image_order):-1:1
+        trail_size *= size_dict[image_order[d]]
+        if trail_size == num_imgs
+            trail_dim = d-1
+            break
+        elseif trail_size > num_imgs
+            error("size inconsistency")
+        end
     end
+    raw_size = Tuple(size_dict[d] for d in image_order if in(d, order))
 
-    im = interpret_blob!(oxr, arr, ((size_dict[d] for d in image_order if in(d, order))...,))
+    subidx = let
+        if isnothing(subidx)
+            [:,:,:,:,:] # 0:(num_imgs - 1)
+        else
+            sub_dict = Dict(zip(order, subidx))
+            Tuple(sub_dict[d] for d in image_order if in(d, order))
+        end
+    end
+    fsubidx = subidx[1:trail_dim-1]
+    tsubidx = subidx[trail_dim:end]
+
+    all_idx = sub_indices(raw_size[trail_dim:end], tsubidx)
+    LI = LinearIndices(raw_size[trail_dim:end])
+    arr = openbytes(oxr, LI[all_idx[1]], fsubidx, raw_size[1:trail_dim-1])
+    for ci in all_idx[2:end]
+        idx = LI[ci]
+        arr_nd = openbytes(oxr, idx, fsubidx, raw_size[1:trail_dim-1])
+        append!(arr, arr_nd)
+    end
+    new_raw_size = clipped_size(raw_size, subidx)
+    im = interpret_blob!(oxr, arr, (new_raw_size...,))
     im = permutedims(im, [findfirst(c, image_order) for c in order])
 
     return AxisArray(im, (Symbol(d) for d in order)...)
@@ -131,15 +183,16 @@ function bf_import(uri; kwargs...)
 end
 
 bf_import_file(uri::URI; kwargs...) = bf_import_file(uri.path; kwargs...)
-function bf_import_file(filename::AbstractString; order="CYXZT", squeeze=false, gray=false)
+function bf_import_file(filename::AbstractString; subset=nothing, subidx=nothing, order="CYXZT", squeeze=false, gray=false)
     OMEXMLReader(filename) do oxr
         xml = get_xml(oxr)
         images = Array{ImageMeta,1}()
 
+        subset = isnothing(subset) ? (1:length(metalst)) : subset
         metalst = get_elements_by_tagname(root(xml), "Image")
-        for i = 1:length(metalst)
+        for i in subset
             set_series!(oxr, i-1)
-            img = open_stack(oxr; order = order)
+            img = open_stack(oxr; subidx=subidx, order = order)
             if squeeze
                 img = dropdims(img; dims=((i for i in 1:ndims(img) if size(img, i) == 1)...,))
             end
