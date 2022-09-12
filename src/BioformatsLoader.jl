@@ -20,7 +20,8 @@ export
     open_stack,
     metadata,
     arraydata,
-    axisnames
+    axisnames,
+    get_num_series
 
 
 include("metadata.jl")
@@ -89,6 +90,7 @@ function clipped_size(sz, subidx)
     return size(sub_indices(sz, subidx))
 end
 
+# a version that reads and limits to a set of ranges
 function openbytes(oxr, idx, fsubidx, raw_size)
     arr_nd = openbytes(oxr, idx)
     arr_nd = reinterpret(getpixeltype(oxr), arr_nd)
@@ -99,7 +101,6 @@ function openbytes(oxr, idx, fsubidx, raw_size)
         return (rv[fsubidx...])[:]
     end
 end
-
 
 function open_stack(oxr::OMEXMLReader; subidx=nothing, order="CYXZT")
     image_order = get_dimension_order(oxr)
@@ -157,7 +158,7 @@ function open_stack(oxr::OMEXMLReader; subidx=nothing, order="CYXZT")
 end
 
 """
-    bf_import(uri::AbstractString; order::AbstractString="TZYXC", squeeze::Bool=false)
+    bf_import(uri::AbstractString; order::AbstractString="TZYXC", squeeze::Bool=false, subset=nothing, subidx=nothing)
 
 Import all images and metadata in the file using Bio-Formats.
 
@@ -169,6 +170,9 @@ greater than one in the `T` or `Z` dimension.
 
 By setting the `squeeze` keyword argument to `true` all singleton dimensions in
 the images will be dropped (even if they are in the `order` argument).
+
+The keyword argument `subset` allows to only import one or multiple specific sets (for datasets with multiple sets)
+and the keyword argument `subidx` allows to import specific ranges of the data (in the `order` as given by the user).
 """
 function bf_import(uri; kwargs...)
     u = URI(uri)
@@ -182,14 +186,27 @@ function bf_import(uri; kwargs...)
     end
 end
 
+"""
+    get_num_series(filename::AbstractString)
+
+returns the number of series present in the file as given by `filename`. Currently URLs are not allowed to avoid multiple downloads. 
+"""
+function get_num_series(filename::AbstractString)
+    OMEXMLReader(filename) do oxr
+        xml = get_xml(oxr)
+        metalst = get_elements_by_tagname(root(xml), "Image")
+        return length(metalst)
+    end
+end
+
 bf_import_file(uri::URI; kwargs...) = bf_import_file(uri.path; kwargs...)
 function bf_import_file(filename::AbstractString; subset=nothing, subidx=nothing, order="CYXZT", squeeze=false, gray=false)
     OMEXMLReader(filename) do oxr
         xml = get_xml(oxr)
         images = Array{ImageMeta,1}()
 
-        subset = isnothing(subset) ? (1:length(metalst)) : subset
         metalst = get_elements_by_tagname(root(xml), "Image")
+        subset = isnothing(subset) ? (1:length(metalst)) : subset
         for i in subset
             set_series!(oxr, i-1)
             img = open_stack(oxr; subidx=subidx, order = order)
