@@ -21,7 +21,7 @@ export
     metadata,
     arraydata,
     axisnames,
-    get_num_series
+    get_num_sets
 
 
 include("metadata.jl")
@@ -90,7 +90,11 @@ function clipped_size(sz, subidx)
     return size(sub_indices(sz, subidx))
 end
 
-# a version that reads and limits to a set of ranges
+"""
+    openbytes(oxr, idx, fsubidx, raw_size)
+
+a version of `openbytes` that reads and limits to a set of ranges. `fsubidx` specifies the index range to use and `raw_size` the ND size of this subimage to read and select a region from.
+"""
 function openbytes(oxr, idx, fsubidx, raw_size)
     arr_nd = openbytes(oxr, idx)
     arr_nd = reinterpret(getpixeltype(oxr), arr_nd)
@@ -123,7 +127,7 @@ function open_stack(oxr::OMEXMLReader; subidx=nothing, order="CYXZT")
     for d=length(image_order):-1:1
         trail_size *= size_dict[image_order[d]]
         if trail_size == num_imgs
-            trail_dim = d-1
+            trail_dim = d
             break
         elseif trail_size > num_imgs
             error("size inconsistency")
@@ -144,10 +148,10 @@ function open_stack(oxr::OMEXMLReader; subidx=nothing, order="CYXZT")
 
     all_idx = sub_indices(raw_size[trail_dim:end], tsubidx)
     LI = LinearIndices(raw_size[trail_dim:end])
-    arr = openbytes(oxr, LI[all_idx[1]], fsubidx, raw_size[1:trail_dim-1])
+    arr = openbytes(oxr, LI[all_idx[1]]-1, fsubidx, raw_size[1:trail_dim-1])
     for ci in all_idx[2:end]
         idx = LI[ci]
-        arr_nd = openbytes(oxr, idx, fsubidx, raw_size[1:trail_dim-1])
+        arr_nd = openbytes(oxr, idx-1, fsubidx, raw_size[1:trail_dim-1])
         append!(arr, arr_nd)
     end
     new_raw_size = clipped_size(raw_size, subidx)
@@ -187,11 +191,11 @@ function bf_import(uri; kwargs...)
 end
 
 """
-    get_num_series(filename::AbstractString)
+    get_num_sets(filename::AbstractString)
 
 returns the number of series present in the file as given by `filename`. Currently URLs are not allowed to avoid multiple downloads. 
 """
-function get_num_series(filename::AbstractString)
+function get_num_sets(filename::AbstractString)
     OMEXMLReader(filename) do oxr
         xml = get_xml(oxr)
         metalst = get_elements_by_tagname(root(xml), "Image")
