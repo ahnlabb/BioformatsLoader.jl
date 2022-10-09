@@ -13,6 +13,7 @@ export
     set_id!,
     OMEXMLReader,
     openbytes,
+    open_reinterpret,
     set_series!,
     getpixeltype,
     open_img,
@@ -21,8 +22,8 @@ export
     metadata,
     arraydata,
     axisnames,
-    get_num_sets
-
+    get_num_sets,
+    get_RGB_channel_count
 
 include("metadata.jl")
 include("omexmlreader.jl")
@@ -90,21 +91,6 @@ function clipped_size(sz, subidx)
     return size(sub_indices(sz, subidx))
 end
 
-"""
-    openbytes(oxr, idx, fsubidx, raw_size)
-
-a version of `openbytes` that reads and limits to a set of ranges. `fsubidx` specifies the index range to use and `raw_size` the ND size of this subimage to read and select a region from.
-"""
-function openbytes(oxr, idx, fsubidx, raw_size)
-    arr_nd = openbytes(oxr, idx)
-    arr_nd = reinterpret(getpixeltype(oxr), arr_nd)
-    if all(typeof.(fsubidx) .== Colon)
-        return arr_nd[:]
-    else
-        rv = reshape(arr_nd, raw_size)
-        return (rv[fsubidx...])[:]
-    end
-end
 
 function open_stack(oxr::OMEXMLReader; subidx=nothing, order="CYXZT")
     image_order = get_dimension_order(oxr)
@@ -148,10 +134,10 @@ function open_stack(oxr::OMEXMLReader; subidx=nothing, order="CYXZT")
 
     all_idx = sub_indices(raw_size[trail_dim:end], tsubidx)
     LI = LinearIndices(raw_size[trail_dim:end])
-    arr = openbytes(oxr, LI[all_idx[1]]-1, fsubidx, raw_size[1:trail_dim-1])
+    arr = open_reinterpret(oxr, LI[all_idx[1]]-1, fsubidx, raw_size[1:trail_dim-1])
     for ci in all_idx[2:end]
         idx = LI[ci]
-        arr_nd = openbytes(oxr, idx-1, fsubidx, raw_size[1:trail_dim-1])
+        arr_nd = open_reinterpret(oxr, idx-1, fsubidx, raw_size[1:trail_dim-1])
         append!(arr, arr_nd)
     end
     new_raw_size = clipped_size(raw_size, subidx)
