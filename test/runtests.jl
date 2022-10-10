@@ -46,6 +46,9 @@ test_slice = (Axis{:T}(1), Axis{:Z}(1), Axis{:C}(1), Axis{:X}(1), Axis{:Y}(:))
 for (fmt, paths) in ome_paths
     for p in paths
         url = "$(ome_imgs_url)/$(fmt)/$(p)"
+        imgs = bf_import(url, subset=1, subidx=[1,10:100,10:100,1,1])
+        @test size(imgs[1]) == (1, 91, 91, 1, 1)
+
         imgs = bf_import(url)
         @test length(imgs) > 0
 
@@ -57,6 +60,7 @@ for (fmt, paths) in ome_paths
             for (order, import_order) in [("TZYXC", (:T, :Z, :Y, :X, :C)),
                                           ("XYCZT", (:X, :Y, :C, :Z, :T))]
                 img = bf_import(imgpath; order)[1]
+                @test get_num_sets(imgpath) == 1
                 @test img.ImportOrder == import_order
                 @test arraydata(img[test_slice...]) == arraydata(imgs[1][test_slice...])
             end

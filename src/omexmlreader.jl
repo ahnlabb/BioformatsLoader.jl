@@ -63,7 +63,64 @@ end
 
 function openbytes(oxr::OMEXMLReader, index::Int)
     local_frame() do
+        # openBytes(int no) : gets image plane number no
         jcall(oxr.reader, "openBytes", Vector{jbyte}, (jint,), index)
+    end
+end
+
+# a version that yields only a region of interest
+"""
+    openbytes(oxr::OMEXMLReader, index::Int, x::Int, y::Int, w::Int, h::Int)
+
+returns a byte[] of the current dataset in the reader oxr and frame index index starting at x-position `x` and y-position `y` (1-based indexing)
+with a width `w` and height `h`. 
+"""
+function openbytes(oxr::OMEXMLReader, index::Int, x::Int, y::Int, w::Int, h::Int)
+    local_frame() do
+        # openBytes(int no, int x int y, int w, int h)
+        jcall(oxr.reader, "openBytes", Vector{jbyte}, (jint, jint, jint, jint, jint), index, x-1, y-1, w, h)
+    end
+end
+
+function get_xywh(fsubidx, raw_size)
+    x = 1; w = Int(raw_size[1]);
+    y = 1; h = Int(raw_size[2]);
+    new_range = Vector{Any}([:,:])
+    if typeof(fsubidx[1]) != Colon
+        x=Int(minimum(fsubidx[1]))
+        w=Int(maximum(fsubidx[1]) - x + 1)
+        # this should even work for ranges of individual indices
+        new_range[1] = fsubidx[1] .- x .+ 1
+    end
+    if typeof(fsubidx[2]) != Colon
+        y=Int(minimum(fsubidx[2]))
+        h=Int(maximum(fsubidx[2]) - y + 1)
+        # this should even work for ranges of individual indices
+        new_range[2] = fsubidx[2] .- y .+ 1
+    end
+    return x, y, w, h, Tuple(new_range)
+end
+
+"""
+    open_reinterpret(oxr, idx, fsubidx, raw_size)
+
+a version of `openbytes` that reads and limits to a set of ranges and reinterprets the data in the correct datatype.
+`fsubidx` specifies the index range to use and `raw_size` the ND size of this subimage to read and select a region from.
+It returns a 1D array of the read data in the datatype of the dataset.
+"""
+function open_reinterpret(oxr, idx, fsubidx, raw_size)
+    if all(typeof.(fsubidx) .== Colon)
+        return reinterpret(getpixeltype(oxr), openbytes(oxr, idx))[:]
+    else
+        x, y, w, h, new_range = get_xywh(fsubidx, raw_size)
+        arr_nd = openbytes(oxr, idx, x, y, w, h)
+        if all(typeof.(new_range) .== Colon)
+            return reinterpret(getpixeltype(oxr), arr_nd)[:]
+        else
+            new_size = (w,h)
+            rv = reshape(reinterpret(getpixeltype(oxr), arr_nd), new_size)
+            return (rv[new_range...])[:]
+        end
     end
 end
 
@@ -98,4 +155,8 @@ end
 
 function get_xml(oxr)
     parse_string(jcall(oxr.meta, "dumpXML", JString, ()))
+end
+
+function get_RGB_channel_count(oxr)
+    jcall(oxr.reader, "getRGBChannelCount", jint, ())
 end
