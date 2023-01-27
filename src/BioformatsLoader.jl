@@ -28,6 +28,62 @@ export
 include("metadata.jl")
 include("omexmlreader.jl")
 
+struct Stack{T}
+    bfr
+    series::Int
+end
+
+struct BFReader{T} <: AbstractVector{Stack{T}}
+    oxr::OMEXMLReader
+    metalst
+    order
+end
+
+function BFReader{T}(oxr::OMEXMLReader; order="CYXZT") where T
+    xml = get_xml(oxr)
+    metalst = get_elements_by_tagname(root(xml), "Image")
+    BFReader{T}(oxr, metalst, order)
+end
+
+
+normtype(::Type{T}) where T <: AbstractFloat = T
+normtype(::Type{T}) where T <: Unsigned = Normed{T, sizeof(T)*8}
+normtype(::Type{Bool}) = Bool
+
+function BFReader(oxr::OMEXMLReader; colorant=nothing, kwargs...)
+    pxtype = getpixeltype(oxr)
+    if !isnothing(colorant)
+        pxtype = colorant{normtype(pxtype)}
+    end
+    BFReader{pxtype}(oxr; kwargs...)
+end
+
+with_oxr(f, T, args...; kwargs...) = OMEXMLReader(oxr -> f(T(oxr; kwargs...)), args...)
+BFReader{T}(filename) where T = BFReader{T}(OMEXMLReader(filename))
+BFReader{T}(fun::Function, filename; kwargs...) where T = with_oxr(fun, BFReader{T}, filename)
+BFReader(fun::Function, filename; kwargs...) =  with_oxr(fun, BFReader, filename; kwargs...)
+
+Base.size(bfr::BFReader, args...) = size(bfr.metalst, args...)
+function Base.getindex(bfr::BFReader{T}, i::Int) where T
+    Stack{T}(bfr, i)
+end
+
+
+_convert(T, x) = convert(T, x)
+_convert(::Type{<:Normed{T}}, x::T) where T = reinterpret(Normed{T, 8sizeof(T)}, x)
+_convert(c::Type{<:Color{C,1}}, x::T) where {C, T} = c(_convert(C, x))
+Base.convert(::Type{AxisArray{T}}, arr::A) where {T, A <: AxisArray{T}} = arr
+Base.convert(::Type{AxisArray{T}}, arr::A) where {T, A <: AxisArray} = map(x -> _convert(T, x), arr)
+
+function Base.getindex(stack::Stack{T}, inds...) where T
+    set_series!(stack.bfr.oxr, stack.series)
+    img = open_stack(stack.bfr.oxr; subidx=inds, order=stack.bfr.order)
+    properties = xml_to_dict(stack.bfr.metalst[stack.series])
+    properties[:ImportOrder] = axisnames(img)
+    ImageMeta(convert(AxisArray{T}, img), properties)
+end
+Base.getindex(stack::Stack) = stack[:,:,:,:,:]
+
 const scheme2importer = Dict{String, Any}()
 
 function add_importer(importer, schemes)
@@ -123,7 +179,7 @@ function open_stack(oxr::OMEXMLReader; subidx=nothing, order="CYXZT")
 
     subidx = let
         if isnothing(subidx)
-            [:,:,:,:,:] # 0:(num_imgs - 1)
+            (:,:,:,:,:) # 0:(num_imgs - 1)
         else
             sub_dict = Dict(zip(order, subidx))
             Tuple(sub_dict[d] for d in image_order if in(d, order))
@@ -181,37 +237,22 @@ end
 
 returns the number of series present in the file as given by `filename`. Currently URLs are not allowed to avoid multiple downloads. 
 """
-function get_num_sets(filename::AbstractString)
-    OMEXMLReader(filename) do oxr
-        xml = get_xml(oxr)
-        metalst = get_elements_by_tagname(root(xml), "Image")
-        return length(metalst)
-    end
-end
+get_num_sets(filename::AbstractString) = length(BFReader(filename))
 
 bf_import_file(uri::URI; kwargs...) = bf_import_file(uri.path; kwargs...)
 function bf_import_file(filename::AbstractString; subset=nothing, subidx=nothing, order="CYXZT", squeeze=false, gray=false)
-    OMEXMLReader(filename) do oxr
-        xml = get_xml(oxr)
-        images = Array{ImageMeta,1}()
-
-        metalst = get_elements_by_tagname(root(xml), "Image")
-        subset = isnothing(subset) ? (1:length(metalst)) : subset
-        for i in subset
-            set_series!(oxr, i-1)
-            img = open_stack(oxr; subidx=subidx, order = order)
+    BFReader(filename; order, colorant=gray ? Gray : nothing) do bfr
+        subset = isnothing(subset) ? Colon() : subset
+        subidx = isnothing(subidx) ? (:,:,:,:,:) : subidx
+        map(bfr[subset]) do stack
+            imgmeta = stack[subidx...]
             if squeeze
-                img = dropdims(img; dims=((i for i in 1:ndims(img) if size(img, i) == 1)...,))
+                img = dropdims(arraydata(imgmeta); dims=((i for i in 1:ndims(img) if size(img, i) == 1)...,))
+                ImageMeta(img, properties(imgmeta))
+            else
+                imgmeta
             end
-            if gray
-                img = as_gray(img)
-            end
-            properties = xml_to_dict(metalst[i])
-            properties[:ImportOrder] = axisnames(img)
-            push!(images, ImageMeta(img, properties))
         end
-
-        return images
     end
 end
 
@@ -239,16 +280,6 @@ function bf_import_http(url::URI, filename::AbstractString; kwargs...)
 end
 
 add_importer(bf_import_http, ["http", "https"])
-
-function as_gray(arr::A) where A <: AbstractArray{T} where T <: Unsigned
-    map(x -> Gray(reinterpret(Normed{T, sizeof(T)*8}, x)), arr)
-end
-function as_gray(arr::A) where A <: AbstractArray{T} where T <: AbstractFloat
-    map(Gray, arr)
-end
-function as_gray(arr::A) where A <: AbstractArray{Bool}
-    map(Gray, arr)
-end
 
 function metadata(filename::String)
     OMEXMLReader(filename) do oxr
