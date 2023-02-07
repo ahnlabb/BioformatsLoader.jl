@@ -27,61 +27,8 @@ export
 
 include("metadata.jl")
 include("omexmlreader.jl")
+include("bfreader.jl")
 
-struct Stack{T}
-    bfr
-    series::Int
-end
-
-struct BFReader{T} <: AbstractVector{Stack{T}}
-    oxr::OMEXMLReader
-    metalst
-    order
-end
-
-function BFReader{T}(oxr::OMEXMLReader; order="CYXZT") where T
-    xml = get_xml(oxr)
-    metalst = get_elements_by_tagname(root(xml), "Image")
-    BFReader{T}(oxr, metalst, order)
-end
-
-
-normtype(::Type{T}) where T <: AbstractFloat = T
-normtype(::Type{T}) where T <: Unsigned = Normed{T, sizeof(T)*8}
-normtype(::Type{Bool}) = Bool
-
-function BFReader(oxr::OMEXMLReader; colorant=nothing, kwargs...)
-    pxtype = getpixeltype(oxr)
-    if !isnothing(colorant)
-        pxtype = colorant{normtype(pxtype)}
-    end
-    BFReader{pxtype}(oxr; kwargs...)
-end
-
-with_oxr(f, T, args...; kwargs...) = OMEXMLReader(oxr -> f(T(oxr; kwargs...)), args...)
-BFReader{T}(filename) where T = BFReader{T}(OMEXMLReader(filename))
-BFReader{T}(fun::Function, filename; kwargs...) where T = with_oxr(fun, BFReader{T}, filename)
-BFReader(fun::Function, filename; kwargs...) =  with_oxr(fun, BFReader, filename; kwargs...)
-
-Base.size(bfr::BFReader, args...) = size(bfr.metalst, args...)
-function Base.getindex(bfr::BFReader{T}, i::Int) where T
-    Stack{T}(bfr, i)
-end
-
-
-_convert(T, x) = convert(T, x)
-_convert(::Type{<:Normed{T}}, x::T) where T = reinterpret(Normed{T, 8sizeof(T)}, x)
-_convert(c::Type{<:Color{C,1}}, x::T) where {C, T} = c(_convert(C, x))
-Base.convert(::Type{AxisArray{T}}, arr::A) where {T, A <: AxisArray{T}} = arr
-Base.convert(::Type{AxisArray{T}}, arr::A) where {T, A <: AxisArray} = map(x -> _convert(T, x), arr)
-
-function Base.getindex(stack::Stack{T}, inds...) where T
-    set_series!(stack.bfr.oxr, stack.series)
-    img = open_stack(stack.bfr.oxr; subidx=inds, order=stack.bfr.order)
-    properties = xml_to_dict(stack.bfr.metalst[stack.series])
-    properties[:ImportOrder] = axisnames(img)
-    ImageMeta(convert(AxisArray{T}, img), properties)
-end
 Base.getindex(stack::Stack) = stack[:,:,:,:,:]
 
 const scheme2importer = Dict{String, Any}()
@@ -96,7 +43,7 @@ function open_img(oxr::OMEXMLReader, index::Int)
     sx = get_size(oxr, "X")
     sy = get_size(oxr, "Y")
     arr = openbytes(oxr, index)
-    return interpret_blob!(oxr, arr, (sx, sy))
+	return reshape(interpret_blob!(oxr, arr), (sx, sy))
 end
 
 for F in (:open_stack, :bf_import, :metadata)
@@ -105,39 +52,22 @@ for F in (:open_stack, :bf_import, :metadata)
             redirect_stdout(() -> $F(filename), redirect)
         end
         function $F(filename::String, show_output::Bool)
-            if show_output
-                $F(filename)
-            else
-                STDOLD = stdout
-                local ret
-                redirect_stdout()
-                try
-                    ret = $F(filename)
-                finally
-                    redirect_stdout(STDOLD)
-                end
-                ret
-            end
+            show_output ? $F(filename) : $F(filename, devnull)
         end
     end
 end
 
-function open_stack(filename::String)
-    OMEXMLReader(open_stack, filename)
-end
-
-function interpret_blob!(oxr, arr, sizes)
+function interpret_blob!(oxr, arr)
     arr = reinterpret(getpixeltype(oxr), arr)
     if !islittleendian(oxr)
         @. arr = ntoh(arr)
     end
-    return reshape(arr, sizes)
+    return arr
 end
 
-function no_colon(sz, subidx)
-    ntuple((d)->typeof(subidx[d]) == Colon ? (1:sz[d]) : 
-            ((typeof(subidx[d]) <: Number) ? (subidx[d]:subidx[d]) : subidx[d]), length(sz))
-end
+no_colon(sz, idx) = idx
+no_colon(sz, idx::Colon) = 1:sz
+no_colon(sz, subidx::Tuple) = ntuple(d -> no_colon(sz[d], subidx[d]), length(sz))
 
 function sub_indices(sz, subidx)
     CartesianIndices(no_colon(sz, subidx))
@@ -147,6 +77,8 @@ function clipped_size(sz, subidx)
     return size(sub_indices(sz, subidx))
 end
 
+
+open_stack(filename::String) = OMEXMLReader(open_stack, filename)
 
 function open_stack(oxr::OMEXMLReader; subidx=nothing, order="CYXZT")
     image_order = get_dimension_order(oxr)
@@ -164,8 +96,8 @@ function open_stack(oxr::OMEXMLReader; subidx=nothing, order="CYXZT")
     end
 
     num_imgs = get_image_count(oxr)
-    trail_size=1;
-    trail_dim=length(image_order)
+    trail_size = 1
+    trail_dim = length(image_order)
     for d=length(image_order):-1:1
         trail_size *= size_dict[image_order[d]]
         if trail_size == num_imgs
@@ -188,19 +120,42 @@ function open_stack(oxr::OMEXMLReader; subidx=nothing, order="CYXZT")
     fsubidx = subidx[1:trail_dim-1]
     tsubidx = subidx[trail_dim:end]
 
-    all_idx = sub_indices(raw_size[trail_dim:end], tsubidx)
-    LI = LinearIndices(raw_size[trail_dim:end])
-    arr = open_reinterpret(oxr, LI[all_idx[1]]-1, fsubidx, raw_size[1:trail_dim-1])
-    for ci in all_idx[2:end]
-        idx = LI[ci]
-        arr_nd = open_reinterpret(oxr, idx-1, fsubidx, raw_size[1:trail_dim-1])
-        append!(arr, arr_nd)
-    end
-    new_raw_size = clipped_size(raw_size, subidx)
-    im = interpret_blob!(oxr, arr, (new_raw_size...,))
-    im = permutedims(im, [findfirst(c, image_order) for c in order])
+	java_idx = let all_idx = sub_indices(raw_size[trail_dim:end], tsubidx)
+		li = LinearIndices(raw_size[trail_dim:end])
+		map(i -> li[i] - 1, all_idx)
+	end
 
-    return AxisArray(im, (Symbol(d) for d in order)...)
+    new_raw_size = clipped_size(raw_size, subidx)
+
+	arr = Array{getpixeltype(oxr)}(undef, new_raw_size...)
+	f = if all(iscolon, fsubidx)
+		i -> interpret_blob!(oxr, openbytes(oxr, i))
+    else
+        x, y, w, h, new_range = get_xywh(fsubidx, raw_size[1:trail_dim-1])
+		get_interpreted(i) = interpret_blob!(oxr, openbytes(oxr, i, x, y, w, h))
+
+		if all(iscolon, new_range)
+			get_interpreted
+        else
+			i -> reshape(get_interpreted(i), (w,h))[new_range...]
+        end
+	end
+	chunk_filled!(f, arr, java_idx)
+
+    img = permutedims(arr, [findfirst(c, image_order) for c in order])
+
+    return AxisArray(img, (Symbol(d) for d in order)...)
+end
+
+iscolon(x) = x isa Colon
+
+chunk_filled!(f, arr, itr::T) where {T} = chunk_filled!(f, arr, Iterators.IteratorSize(T), itr)
+function chunk_filled!(f, arr, ::T, itr) where {T <: Union{Iterators.HasShape, Iterators.HasLength}}
+	chunk_size = fld(length(arr), length(itr))
+	for (i, x) in enumerate(itr)
+		arr[(i-1)*chunk_size+1:i*chunk_size] .= view(f(x), :)
+	end
+	return arr
 end
 
 """
@@ -281,38 +236,25 @@ end
 
 add_importer(bf_import_http, ["http", "https"])
 
-function metadata(filename::String)
-    OMEXMLReader(filename) do oxr
-        xml = get_xml(oxr)
-        properties = Dict{String, Any}()
-        metalst = get_elements_by_tagname(root(xml), "Image")
+metadata(filename::String) = BFReader(metadata, filename)
+metadata(bfr::BFReader) = metadata(bfr[1])
 
-        SizeC = get_size(oxr, "C")
+_attribute_pairs(x::XMLElement) = (string(name(a)) => value(a) for a in attributes(x))
 
-        for a = attributes(metalst[1])
-            push!(properties, "$(name(a))"=>value(a))
-        end
-        for a = attributes(find_element(metalst[1], "Pixels"))
-            try
-                push!(properties, "$(name(a))"=> parse(Float64, value(a)))
-            catch ex
-                if ex isa ArgumentError
-                    push!(properties, "$(name(a))"=>  value(a))
-                end
-            end
-        end
-
-        if length(metalst[1]["Pixels"][1]["Channel"]) == SizeC
-            for i in 1:SizeC
-                for a in attributes(metalst[1]["Pixels"][1]["Channel"][i])
-                    if name(a)== "EmissionWavelength"
-                        push!(properties, "channel_$i"=>value(a))
-                    end
-                end
-            end
-        end
-        properties
-    end
+function metadata(stack::Stack)
+	meta = stack.bfr.metalst[stack.series]
+	pixels = meta["Pixels"][1]
+	[
+		_attribute_pairs(meta),
+		Iterators.map(_attribute_pairs(pixels)) do (k, val)
+			parsed = tryparse(Float64, val)
+			k => (parsed === nothing ? val : parsed)
+		end,
+		Iterators.map(Iterators.enumerate(pixels["Channel"])) do (i, e)
+			val = attribute(e, "EmissionWavelength"; required=false)
+			"channel_$i"=>val
+		end
+	] |> Iterators.flatten |> Dict
 end
 
 const levels = ["ALL", "DEBUG", "ERROR", "FATAL", "INFO", "OFF", "TRACE", "WARN"]
