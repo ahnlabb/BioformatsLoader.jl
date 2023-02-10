@@ -192,14 +192,14 @@ end
 
 returns the number of series present in the file as given by `filename`. Currently URLs are not allowed to avoid multiple downloads. 
 """
-get_num_sets(filename::AbstractString) = length(BFReader(filename))
+get_num_sets(filename::AbstractString) = BFReader(length, filename)
 
+mapindex(f, arr, index) = map(f, arr[index])
+mapindex(f, arr, index::Number) = f(arr[index])
 bf_import_file(uri::URI; kwargs...) = bf_import_file(uri.path; kwargs...)
-function bf_import_file(filename::AbstractString; subset=nothing, subidx=nothing, order="CYXZT", squeeze=false, gray=false)
+function bf_import_file(filename::AbstractString; subset=Colon(), subidx=(:,:,:,:,:), order="CYXZT", squeeze=false, gray=false)
     BFReader(filename; order, colorant=gray ? Gray : nothing) do bfr
-        subset = isnothing(subset) ? Colon() : subset
-        subidx = isnothing(subidx) ? (:,:,:,:,:) : subidx
-        map(bfr[subset]) do stack
+        mapindex(bfr, subset) do stack
             imgmeta = stack[subidx...]
             if squeeze
                 img = dropdims(arraydata(imgmeta); dims=((i for i in 1:ndims(img) if size(img, i) == 1)...,))

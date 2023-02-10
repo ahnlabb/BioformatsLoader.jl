@@ -47,7 +47,7 @@ for (fmt, paths) in ome_paths
     for p in paths
         url = "$(ome_imgs_url)/$(fmt)/$(p)"
         imgs = bf_import(url, subset=1, subidx=[1,10:100,10:100,1,1])
-        @test size(imgs[1]) == (1, 91, 91, 1, 1)
+        @test size(imgs) == (1, 91, 91, 1, 1)
 
         imgs = bf_import(url)
         @test length(imgs) > 0
