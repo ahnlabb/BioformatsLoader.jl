@@ -31,6 +31,7 @@ with_oxr(f, T, args...; kwargs...) = OMEXMLReader(oxr -> f(T(oxr; kwargs...)), a
 BFReader{T}(filename) where T = BFReader{T}(OMEXMLReader(filename))
 BFReader{T}(fun::Function, filename; kwargs...) where T = with_oxr(fun, BFReader{T}, filename)
 BFReader(fun::Function, filename; kwargs...) =  with_oxr(fun, BFReader, filename; kwargs...)
+BFReader(filename; kwargs...) =  BFReader(OMEXMLReader(filename); kwargs...)
 
 Base.size(bfr::BFReader, args...) = size(bfr.metalst, args...)
 function Base.getindex(bfr::BFReader{T}, i::Int) where T
@@ -44,7 +45,7 @@ Base.convert(::Type{AxisArray{T}}, arr::A) where {T, A <: AxisArray{T}} = arr
 Base.convert(::Type{AxisArray{T}}, arr::A) where {T, A <: AxisArray} = map(x -> _convert(T, x), arr)
 
 function Base.getindex(stack::Stack{T}, inds...) where T
-    set_series!(stack.bfr.oxr, stack.series)
+    set_series!(stack.bfr.oxr, stack.series - 1)
     img = open_stack(stack.bfr.oxr; subidx=inds, order=stack.bfr.order)
     properties = xml_to_dict(stack.bfr.metalst[stack.series])
     properties[:ImportOrder] = axisnames(img)
