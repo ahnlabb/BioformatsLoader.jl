@@ -202,7 +202,7 @@ function bf_import_file(filename::AbstractString; subset=Colon(), subidx=(:,:,:,
         mapindex(bfr, subset) do stack
             imgmeta = stack[subidx...]
             if squeeze
-                img = dropdims(arraydata(imgmeta); dims=((i for i in 1:ndims(img) if size(img, i) == 1)...,))
+                img = dropdims(arraydata(imgmeta); dims=((i for i in 1:ndims(imgmeta) if size(imgmeta, i) == 1)...,))
                 ImageMeta(img, properties(imgmeta))
             else
                 imgmeta
