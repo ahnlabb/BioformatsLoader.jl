@@ -70,12 +70,12 @@ end
 
 # a version that yields only a region of interest
 """
-    openbytes(oxr::OMEXMLReader, index::Int, x::Int, y::Int, w::Int, h::Int)
+    openbytes(oxr::OMEXMLReader, index::Int, x, y, w, h)
 
 returns a byte[] of the current dataset in the reader oxr and frame index index starting at x-position `x` and y-position `y` (1-based indexing)
 with a width `w` and height `h`. 
 """
-function openbytes(oxr::OMEXMLReader, index::Int, x::Int, y::Int, w::Int, h::Int)
+function openbytes(oxr::OMEXMLReader, index::Int, x, y, w, h)
     local_frame() do
         # openBytes(int no, int x int y, int w, int h)
         jcall(oxr.reader, "openBytes", Vector{jbyte}, (jint, jint, jint, jint, jint), index, x-1, y-1, w, h)
