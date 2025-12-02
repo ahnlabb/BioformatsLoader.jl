@@ -82,8 +82,8 @@ function openbytes(oxr::OMEXMLReader, index::Int, x, y, w, h)
     end
 end
 
-function get_xywh(fsubidx, raw_size)
-	(x, w, r_x), (y, h, r_y) = map(fsubidx, raw_size) do idx, sz
+function get_lengths_and_ranges(fsubidx, raw_size)
+	map(fsubidx, raw_size) do idx, sz
 		if iscolon(idx)
 			(1, sz, :)
 		else
@@ -93,7 +93,6 @@ function get_xywh(fsubidx, raw_size)
 			bot, len, idx .- bot .+ 1
 		end
 	end
-    return x, y, w, h, (r_x, r_y)
 end
 
 function set_series!(oxr::OMEXMLReader, index::Int)

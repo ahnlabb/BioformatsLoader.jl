@@ -81,70 +81,77 @@ end
 open_stack(filename::String) = OMEXMLReader(open_stack, filename)
 
 function open_stack(oxr::OMEXMLReader; subidx=nothing, order="CYXZT")
-    image_order = get_dimension_order(oxr)
-    if isinterleaved(oxr)
-        image_order = replace(image_order, "XYC" => "CXY")
-    end
+  image_order = get_dimension_order(oxr)
+  if isinterleaved(oxr)
+      image_order = replace(image_order, "XYC" => "CXY")
+  end
 
-    sizes = [get_size(oxr, d) for d in image_order]
-    size_dict = Dict(zip(image_order, sizes))
+  sizes = [get_size(oxr, d) for d in image_order]
+  size_dict = Dict(zip(image_order, sizes))
 
-    for d in image_order
-        if !in(d, order)
-            @assert (size_dict[d] == 1) "Non-singleton dimension \"$d\" is not present in the requested image order \"$order\""
-        end
-    end
+  for d in image_order
+      if !in(d, order)
+          @assert (size_dict[d] == 1) "Non-singleton dimension \"$d\" is not present in the requested image order \"$order\""
+      end
+  end
 
-    num_imgs = get_image_count(oxr)
-    trail_size = 1
-    trail_dim = length(image_order)
-    for d=length(image_order):-1:1
-        trail_size *= size_dict[image_order[d]]
-        if trail_size == num_imgs
-            trail_dim = d
-            break
-        elseif trail_size > num_imgs
-            error("size inconsistency")
-        end
-    end
-    raw_size = Tuple(size_dict[d] for d in image_order if in(d, order))
+  num_imgs = get_image_count(oxr)
+  trail_size = 1
+  trail_dim = length(image_order)
+  for d=length(image_order):-1:1
+      trail_size *= size_dict[image_order[d]]
+      if trail_size == num_imgs
+          trail_dim = d
+          break
+      elseif trail_size > num_imgs
+          error("size inconsistency")
+      end
+  end
+  raw_size = Tuple(size_dict[d] for d in image_order if in(d, order))
 
-    subidx = let
-        if isnothing(subidx)
-            (:,:,:,:,:) # 0:(num_imgs - 1)
-        else
-            sub_dict = Dict(zip(order, subidx))
-            Tuple(sub_dict[d] for d in image_order if in(d, order))
-        end
-    end
-    fsubidx = subidx[1:trail_dim-1]
-    tsubidx = subidx[trail_dim:end]
+  subidx = let
+      if isnothing(subidx)
+          (:,:,:,:,:) # 0:(num_imgs - 1)
+      else
+          sub_dict = Dict(zip(order, subidx))
+          Tuple(in(d, order) ? sub_dict[d] : Colon() for d in image_order)
+      end
+  end
+
+  sub_dict = Dict(zip(image_order, subidx))
+
+  fsubidx = subidx[1:trail_dim-1]
+  tsubidx = subidx[trail_dim:end]
 
 	java_idx = let all_idx = sub_indices(raw_size[trail_dim:end], tsubidx)
 		li = LinearIndices(raw_size[trail_dim:end])
 		map(i -> li[i] - 1, all_idx)
 	end
 
-    new_raw_size = clipped_size(raw_size, subidx)
+  new_raw_size = clipped_size(raw_size, subidx)
 
 	arr = Array{getpixeltype(oxr)}(undef, new_raw_size...)
 	f = if all(iscolon, fsubidx)
 		i -> interpret_blob!(oxr, openbytes(oxr, i))
-    else
-        x, y, w, h, new_range = get_xywh(fsubidx, raw_size[1:trail_dim-1])
-		get_interpreted(i) = interpret_blob!(oxr, openbytes(oxr, i, x, y, w, h))
+  else
+    x, y, w, h, new_range = get_xywh((sub_dict[x] for x in "XY"), (size_dict[x] for x in "XY"))
+    rgb_c = get_RGB_channel_count(oxr)
+    rc = sub_dict['C']
+    get_interpreted(i) = interpret_blob!(oxr, openbytes(oxr, i, x, y, w, h))
 
-		if all(iscolon, new_range)
-			get_interpreted
-        else
-			i -> reshape(get_interpreted(i), (w,h))[new_range...]
-        end
+    if all(iscolon, new_range) && (rgb_c == 1 || iscolon(rc))
+      get_interpreted
+    else
+      new_sz = Dict('C' => rgb_c, 'X' => w, 'Y' => h)
+      new_idx = Dict('C' => rc, 'X' => new_range[1], 'Y' => new_range[2])
+      i -> reshape(get_interpreted(i), Tuple(new_sz[d] for d in image_order if haskey(new_sz, d)))[(new_idx[d] for d in image_order if haskey(new_idx, d))...]
+    end
 	end
 	chunk_filled!(f, arr, java_idx)
 
-    img = permutedims(arr, [findfirst(c, image_order) for c in order])
+  img = permutedims(arr, [findfirst(c, image_order) for c in order])
 
-    return AxisArray(img, (Symbol(d) for d in order)...)
+  return AxisArray(img, (Symbol(d) for d in order)...)
 end
 
 iscolon(x) = x isa Colon
