@@ -134,16 +134,16 @@ function open_stack(oxr::OMEXMLReader; subidx=nothing, order="CYXZT")
 	f = if all(iscolon, fsubidx)
 		i -> interpret_blob!(oxr, openbytes(oxr, i))
   else
-    x, y, w, h, new_range = get_lengths_and_ranges((sub_dict[x] for x in "XY"), (size_dict[x] for x in "XY"))
+    (x, w, rx), (y, h, ry) = get_lengths_and_ranges((sub_dict[x] for x in "XY"), (size_dict[x] for x in "XY"))
     rgb_c = get_RGB_channel_count(oxr)
     rc = sub_dict['C']
     get_interpreted(i) = interpret_blob!(oxr, openbytes(oxr, i, x, y, w, h))
 
-    if all(iscolon, new_range) && (rgb_c == 1 || iscolon(rc))
+    if iscolon(rx) && iscolon(ry) && (rgb_c == 1 || iscolon(rc))
       get_interpreted
     else
       new_sz = Dict('C' => rgb_c, 'X' => w, 'Y' => h)
-      new_idx = Dict('C' => rc, 'X' => new_range[1], 'Y' => new_range[2])
+      new_idx = Dict('C' => rc, 'X' => rx, 'Y' => ry)
       i -> reshape(get_interpreted(i), Tuple(new_sz[d] for d in image_order if haskey(new_sz, d)))[(new_idx[d] for d in image_order if haskey(new_idx, d))...]
     end
 	end
