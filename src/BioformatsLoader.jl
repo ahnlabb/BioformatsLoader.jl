@@ -134,7 +134,7 @@ function open_stack(oxr::OMEXMLReader; subidx=nothing, order="CYXZT")
 	f = if all(iscolon, fsubidx)
 		i -> interpret_blob!(oxr, openbytes(oxr, i))
   else
-    x, y, w, h, new_range = get_xywh((sub_dict[x] for x in "XY"), (size_dict[x] for x in "XY"))
+    x, y, w, h, new_range = get_lengths_and_ranges((sub_dict[x] for x in "XY"), (size_dict[x] for x in "XY"))
     rgb_c = get_RGB_channel_count(oxr)
     rc = sub_dict['C']
     get_interpreted(i) = interpret_blob!(oxr, openbytes(oxr, i, x, y, w, h))
